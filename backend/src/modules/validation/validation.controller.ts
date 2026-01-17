@@ -3,7 +3,7 @@ import { ValidationService } from "./validation.service";
 
 class ValidateVoucherDto {
   cpf?: string; // Opcional - para validação no restaurante
-  code: string;
+  code!: string;
 }
 
 @Controller("validation")

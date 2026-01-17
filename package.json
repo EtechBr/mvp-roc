@@ -4,7 +4,7 @@
   "private": true,
   "description": "ROC Passaporte - MVP Backend e Frontend",
   "scripts": {
-    "dev": "npx concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "npx concurrently -k -s first -n \"backend,frontend\" -c \"blue,green\" --kill-others-on-fail \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run start:dev",
     "dev:frontend": "cd frontend && npm run dev",
     "build": "npm run build:backend && npm run build:frontend",
@@ -19,11 +19,12 @@
     "lint:frontend": "cd frontend && npm run lint"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "@tailwindcss/postcss": "^4",
+    "tailwindcss": "^4"
   },
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
   }
 }
-
