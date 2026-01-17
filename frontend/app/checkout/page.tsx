@@ -165,7 +165,7 @@ export default function CheckoutPage() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-4">
                   <div className="space-y-1 text-sm">
-                    <label htmlFor="cardNumber" className="block font-medium text-zinc-800">
+                    <label htmlFor="cardNumber" className="block font-medium text-[var(--color-text-dark)]">
                       Número do cartão
                     </label>
                     <input
@@ -301,7 +301,7 @@ export default function CheckoutPage() {
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
+                  className="w-full rounded-lg bg-[var(--color-roc-primary)] px-4 py-3 text-sm font-semibold text-[var(--color-white)] hover:bg-[var(--color-roc-primary-dark)]"
                 >
                   Já efetuei o pagamento
                 </button>
@@ -324,7 +324,7 @@ export default function CheckoutPage() {
                     ✓ Desconto de 5% aplicado (PIX)
                   </div>
                 )}
-                <div className="border-t border-zinc-100 pt-3">
+                <div className="border-t border-[var(--color-border)] pt-3">
                   <div className="flex justify-between text-base font-semibold">
                     <span>Total</span>
                     <span>{paymentMethod === "pix" ? "R$ 94,99" : "R$ 99,99"}</span>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { MapPin, ForkKnife, Calendar, Gift } from "@phosphor-icons/react";
+import { RestaurantCard } from "../components/RestaurantCard";
 
 // Dados mockados dos restaurantes - será substituído por API
 const restaurants = [
@@ -37,7 +38,7 @@ const cities = Array.from(new Set(restaurants.map((r) => r.city)));
 export default function BenefitsPage() {
   return (
     <div className="min-h-screen bg-[var(--color-bg-light)] font-sans text-[var(--color-text-dark)]">
-      <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-[var(--spacing-6)] px-[var(--spacing-4)] py-[var(--spacing-6)] md:px-[var(--spacing-5)] md:py-[var(--spacing-7)]">
+      <main className="mx-auto flex min-h-screen w-full max-w-[1920px] flex-col gap-[var(--spacing-6)] px-4 py-[var(--spacing-6)] md:px-6 lg:px-8 xl:px-12 md:py-[var(--spacing-7)]">
         <header className="flex items-center justify-between">
           <Link href="/" className="text-xl font-bold tracking-tight">
             <span className="text-[var(--color-roc-primary)]">ROC</span> Passaporte
@@ -127,27 +128,9 @@ export default function BenefitsPage() {
             </select>
           </div>
 
-          <div className="grid gap-[var(--spacing-3)] md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
             {restaurants.map((restaurant) => (
-              <div
-                key={restaurant.id}
-                className="rounded-xl border border-[var(--color-border)] bg-[var(--color-white)] p-[var(--spacing-3)] shadow-soft transition hover:border-[var(--color-roc-primary-light)] hover:shadow-medium"
-              >
-                <div className="mb-2 flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-[var(--color-text-dark)]">
-                      {restaurant.name}
-                    </h3>
-                    <div className="mt-1 flex items-center gap-1 text-xs text-[var(--color-text-medium)]">
-                      <MapPin size={14} weight="fill" />
-                      <span>{restaurant.city}</span>
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-[var(--color-roc-primary-light)]/10 px-2 py-1 text-xs font-semibold text-[var(--color-roc-primary)]">
-                    {restaurant.discount}
-                  </span>
-                </div>
-              </div>
+              <RestaurantCard key={restaurant.id} restaurant={restaurant} />
             ))}
           </div>
         </section>

@@ -1,337 +1,390 @@
 "use client";
 
 import { useState } from "react";
-import { QrCode, IdentificationCard, Lock, CheckCircle, User, Copy } from "@phosphor-icons/react";
+import {
+  CheckCircle,
+  XCircle,
+  Keyboard,
+  QrCode,
+  ArrowClockwise,
+  ArrowLeft,
+  Storefront,
+  Tag,
+  Clock,
+  Sparkle,
+  ForkKnife,
+} from "@phosphor-icons/react";
+import { QRScanner } from "../components/QRScanner";
+
+type ValidationMode = "choice" | "manual" | "scanner";
+type ValidationStatus = "idle" | "validating" | "success" | "error";
 
 export default function ValidatePage() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [validationMethod, setValidationMethod] = useState<"qr" | "cpf">("cpf");
-  const [step, setStep] = useState<"login" | "validate" | "confirm" | "success">("login");
-  const [formData, setFormData] = useState({
-    username: "",
-    password: "",
-    cpf: "",
-  });
+  const [mode, setMode] = useState<ValidationMode>("choice");
+  const [inputCode, setInputCode] = useState("");
+  const [validationStatus, setValidationStatus] = useState<ValidationStatus>("idle");
+  const [couponInfo, setCouponInfo] = useState<{ restaurant: string; offer: string } | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
 
-  // Dados mockados do voucher após validação
-  const [voucherData, setVoucherData] = useState<{
-    userName: string;
-    cpf: string;
-    restaurantName: string;
-    discount: string;
-  } | null>(null);
-
-  const formatCPF = (value: string) => {
-    const numbers = value.replace(/\D/g, "");
-    if (numbers.length <= 11) {
-      return numbers
-        .replace(/(\d{3})(\d)/, "$1.$2")
-        .replace(/(\d{3})(\d)/, "$1.$2")
-        .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-    }
-    return value;
+  // Dados mockados - será substituído por API
+  const mockValidCoupons: Record<string, { restaurant: string; offer: string }> = {
+    ROC0001: {
+      restaurant: "Cantina Bella Italia",
+      offer: "30% OFF em qualquer prato principal",
+    },
+    ROC0002: {
+      restaurant: "Churrascaria Gaúcha",
+      offer: "25% OFF em todo o cardápio",
+    },
+    ROC0123: {
+      restaurant: "Restaurante Sabor do Norte",
+      offer: "20% OFF em todo o menu",
+    },
   };
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Login mockado - em produção seria validação com backend
-    if (formData.username && formData.password) {
-      setIsLoggedIn(true);
-      setStep("validate");
-    }
-  };
+  const handleValidate = (code: string) => {
+    if (!code.trim()) return;
 
-  const handleValidateCPF = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cpfNumbers = formData.cpf.replace(/\D/g, "");
-    
-    // Validação mockada - em produção seria busca no backend
-    if (cpfNumbers.length === 11) {
-      // Simular busca do voucher
-      setVoucherData({
-        userName: "João Silva",
-        cpf: formData.cpf,
-        restaurantName: "Restaurante Parceiro",
-        discount: "20% OFF",
-      });
-      setStep("confirm");
-    }
-  };
+    setIsValidating(true);
+    setValidationStatus("validating");
 
-  const handleConfirmUse = () => {
-    // Confirmar uso do voucher
-    setStep("success");
-    // Em produção: chamada à API para invalidar o voucher
+    // Simular validação (delay de 1.2s)
     setTimeout(() => {
-      setStep("validate");
-      setFormData({ ...formData, cpf: "" });
-      setVoucherData(null);
-    }, 3000);
+      const codeUpper = code.toUpperCase().trim();
+      const coupon = mockValidCoupons[codeUpper];
+
+      if (coupon) {
+        // Cupom válido encontrado!
+        setCouponInfo(coupon);
+        setValidationStatus("success");
+      } else {
+        setValidationStatus("error");
+        setCouponInfo(null);
+      }
+
+      setIsValidating(false);
+    }, 1200);
   };
 
-  const handleQRScan = () => {
-    // Simular escaneamento de QR Code
-    // Em produção: usar biblioteca de leitura de QR Code da câmera
-    alert("Funcionalidade de escaneamento será implementada com biblioteca de câmera");
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleValidate(inputCode);
   };
 
-  // Tela de Login
-  if (step === "login") {
+  const handleQRScan = (code: string) => {
+    handleValidate(code);
+  };
+
+  const handleReset = () => {
+    setInputCode("");
+    setValidationStatus("idle");
+    setCouponInfo(null);
+    setMode("choice");
+  };
+
+  // Se estiver no modo scanner, renderizar componente QRScanner
+  if (mode === "scanner" && validationStatus === "idle") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-light)] px-[var(--spacing-4)]">
-        <div className="w-full max-w-md rounded-2xl bg-[var(--color-white)] p-[var(--spacing-4)] shadow-soft">
-          <div className="mb-6 text-center">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              <span className="text-[var(--color-roc-primary)]">ROC</span> Validação
-            </h1>
-            <p className="mt-2 text-xs text-[var(--color-text-medium)]">
-              Acesso restrito para restaurantes parceiros
-            </p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1 text-sm">
-              <label
-                htmlFor="username"
-                className="flex items-center gap-2 font-medium text-[var(--color-text-dark)]"
-              >
-                <User size={16} weight="fill" className="text-[var(--color-text-medium)]" />
-                Usuário
-              </label>
-              <input
-                id="username"
-                type="text"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                className="w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[var(--color-roc-primary)] focus:ring-1 focus:ring-[var(--color-roc-primary)]"
-                placeholder="Digite seu usuário"
-                required
-              />
-            </div>
-
-            <div className="space-y-1 text-sm">
-              <label
-                htmlFor="password"
-                className="flex items-center gap-2 font-medium text-[var(--color-text-dark)]"
-              >
-                <Lock size={16} weight="fill" className="text-[var(--color-text-medium)]" />
-                Senha
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[var(--color-roc-primary)] focus:ring-1 focus:ring-[var(--color-roc-primary)]"
-                placeholder="Digite sua senha"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="mt-2 w-full rounded-lg bg-[var(--color-roc-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-white)] hover:bg-[var(--color-roc-primary-dark)]"
-            >
-              Entrar
-            </button>
-          </form>
-
-          <p className="mt-4 text-center text-xs text-[var(--color-text-medium)]">
-            Credenciais fornecidas pelo administrador do ROC
-          </p>
-        </div>
-      </div>
+      <QRScanner
+        onScan={handleQRScan}
+        onClose={() => {
+          setMode("choice");
+        }}
+      />
     );
   }
 
-  // Tela de Sucesso
-  if (step === "success") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-light)] px-[var(--spacing-4)]">
-        <div className="w-full max-w-md rounded-2xl bg-[var(--color-white)] p-[var(--spacing-4)] text-center shadow-soft">
-          <div className="mb-4 flex justify-center">
-            <div className="rounded-full bg-[var(--color-roc-success)]/10 p-4">
-              <CheckCircle size={48} className="text-[var(--color-roc-success)]" weight="fill" />
+    <div className="flex min-h-screen flex-col bg-gradient-to-br from-[var(--color-roc-primary)] via-[var(--color-roc-primary)] to-[var(--color-roc-primary-dark)]">
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[var(--color-roc-primary-dark)]/80 py-3 backdrop-blur-md sm:py-4">
+        <div className="mx-auto w-full max-w-[1400px] px-[var(--spacing-4)]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <ForkKnife size={24} weight="fill" className="text-[var(--color-white)]" />
+            <div>
+                <span className="text-lg font-bold text-[var(--color-white)] sm:text-xl">
+                  ROC Passaporte
+                </span>
+                <span className="ml-2 hidden text-sm text-white/60 sm:inline">
+                  | Portal do Lojista
+                </span>
+            </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 animate-pulse rounded-full bg-[var(--color-roc-success)]" />
+              <span className="text-xs text-white/70 sm:text-sm">Online</span>
             </div>
           </div>
-          <h2 className="mb-2 text-xl font-semibold tracking-tight">Voucher validado!</h2>
-          <p className="text-sm text-[var(--color-text-medium)]">
-            O voucher foi utilizado com sucesso
-          </p>
         </div>
-      </div>
-    );
-  }
+      </header>
 
-  // Tela de Confirmação
-  if (step === "confirm" && voucherData) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-light)] px-[var(--spacing-4)]">
-        <div className="w-full max-w-md rounded-2xl bg-[var(--color-white)] p-[var(--spacing-4)] shadow-soft">
-          <h2 className="mb-4 text-center text-xl font-semibold tracking-tight">
-            Confirmar uso do voucher
-          </h2>
-
-          <div className="mb-6 space-y-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-light)] p-4">
-            <div>
-              <p className="text-xs font-medium text-[var(--color-text-medium)]">Restaurante</p>
-              <p className="text-sm font-semibold text-[var(--color-text-dark)]">
-                {voucherData.restaurantName}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-[var(--color-text-medium)]">Cliente</p>
-              <p className="text-sm font-semibold text-[var(--color-text-dark)]">
-                {voucherData.userName}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-[var(--color-text-medium)]">CPF</p>
-              <p className="text-sm font-semibold text-[var(--color-text-dark)]">
-                {voucherData.cpf}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-[var(--color-text-medium)]">Desconto</p>
-              <p className="text-sm font-semibold text-[var(--color-roc-primary)]">
-                {voucherData.discount}
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={handleConfirmUse}
-            className="w-full rounded-lg bg-[var(--color-roc-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-white)] hover:bg-[var(--color-roc-primary-dark)]"
-          >
-            Confirmar uso
-          </button>
-
-          <button
-            onClick={() => {
-              setStep("validate");
-              setFormData({ ...formData, cpf: "" });
-              setVoucherData(null);
-            }}
-            className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-white)] px-4 py-2 text-sm font-medium text-[var(--color-text-medium)] hover:bg-[var(--color-bg-light)]"
-          >
-            Cancelar
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Tela de Validação
-  return (
-    <div className="min-h-screen bg-[var(--color-bg-light)] px-[var(--spacing-4)] py-[var(--spacing-5)]">
-      <div className="mx-auto max-w-md">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-xl font-semibold tracking-tight">
-            <span className="text-[var(--color-roc-primary)]">ROC</span> Validação
-          </h1>
-          <button
-            onClick={() => {
-              setIsLoggedIn(false);
-              setStep("login");
-              setFormData({ username: "", password: "", cpf: "" });
-            }}
-            className="text-xs text-[var(--color-text-medium)] hover:text-[var(--color-text-dark)]"
-          >
-            Sair
-          </button>
-        </div>
-
-        <div className="rounded-2xl bg-[var(--color-white)] p-[var(--spacing-4)] shadow-soft">
-          <p className="mb-6 text-center text-sm text-[var(--color-text-medium)]">
-            Escolha o método de validação
-          </p>
-
-          {/* Seletor de método */}
-          <div className="mb-6 flex gap-3 rounded-lg border border-[var(--color-border)] p-1">
-            <button
-              type="button"
-              onClick={() => setValidationMethod("qr")}
-              className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                validationMethod === "qr"
-                  ? "bg-[var(--color-roc-primary)] text-[var(--color-white)]"
-                  : "text-[var(--color-text-medium)] hover:bg-[var(--color-bg-light)]"
-              }`}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <QrCode size={18} weight={validationMethod === "qr" ? "fill" : "regular"} />
-                Escanear QR Code
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setValidationMethod("cpf")}
-              className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                validationMethod === "cpf"
-                  ? "bg-[var(--color-roc-primary)] text-[var(--color-white)]"
-                  : "text-[var(--color-text-medium)] hover:bg-[var(--color-bg-light)]"
-              }`}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <IdentificationCard size={18} weight={validationMethod === "cpf" ? "fill" : "regular"} />
-                Digitar CPF
-              </div>
-            </button>
-          </div>
-
-          {validationMethod === "qr" ? (
+      {/* Main Content */}
+      <main className="flex flex-1 items-center justify-center p-4 sm:p-6">
+        <div className="w-full max-w-md">
+          {/* Choice Mode - Selecionar método de validação */}
+          {mode === "choice" && validationStatus === "idle" && (
             <div className="space-y-4">
-              <button
-                type="button"
-                onClick={handleQRScan}
-                className="w-full rounded-lg border-2 border-dashed border-[var(--color-border)] bg-[var(--color-bg-light)] px-4 py-8 text-sm font-medium text-[var(--color-text-medium)] hover:border-[var(--color-roc-primary)] hover:bg-[var(--color-roc-primary-light)]/10"
-              >
-                <div className="flex flex-col items-center gap-2">
-                  <QrCode size={32} className="text-[var(--color-text-medium)]" weight="fill" />
-                  <span>Ativar câmera para escanear QR Code</span>
+              {/* Welcome Card */}
+              <div className="rounded-2xl bg-[var(--color-white)] p-6 text-center shadow-large sm:rounded-3xl sm:p-8">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--color-roc-primary)] to-[var(--color-roc-primary-light)] shadow-medium sm:mb-5 sm:h-16 sm:w-16">
+                  <Sparkle size={28} weight="fill" className="text-[var(--color-white)] sm:w-8 sm:h-8" />
                 </div>
-              </button>
-              <p className="text-center text-xs text-[var(--color-text-medium)]">
-                Apontar a câmera para o QR Code exibido na tela do cliente
+                <h1 className="mb-2 text-xl font-bold text-[var(--color-text-dark)] sm:text-2xl">
+                  Validar Cupom
+                </h1>
+                <p className="text-sm text-[var(--color-text-medium)] sm:text-base">
+                  Escolha como deseja validar o cupom do cliente
+                </p>
+      </div>
+
+              {/* Opções de Validação */}
+              <div className="grid gap-3 sm:gap-4">
+                {/* Opção QR Code Scanner */}
+                <button
+                  onClick={() => {
+                    setMode("scanner");
+                  }}
+                  className="group rounded-xl border-2 border-transparent bg-[var(--color-white)] p-4 text-left shadow-medium transition-all hover:border-[var(--color-roc-primary)]/30 hover:bg-[var(--color-white)]/80 sm:rounded-2xl sm:p-5"
+          >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-roc-primary)]/10 transition-colors group-hover:bg-[var(--color-roc-primary)]/20 sm:h-14 sm:w-14">
+                      <QrCode size={28} weight="fill" className="text-[var(--color-roc-primary)]" />
+        </div>
+                    <div className="flex-1">
+                      <h3 className="mb-0.5 text-base font-semibold text-[var(--color-text-dark)] sm:text-lg">
+                        Escanear QR Code
+                      </h3>
+                      <p className="text-xs text-[var(--color-text-medium)] sm:text-sm">
+                        Use a câmera para ler o código
+                      </p>
+                    </div>
+                    <div className="hidden text-[var(--color-roc-primary)] opacity-0 transition-opacity group-hover:opacity-100 sm:block">
+                      →
+                    </div>
+              </div>
+            </button>
+
+                {/* Opção Digitar Código */}
+            <button
+                  onClick={() => setMode("manual")}
+                  className="group rounded-xl border-2 border-transparent bg-[var(--color-white)] p-4 text-left shadow-medium transition-all hover:border-[var(--color-roc-accent)]/30 hover:bg-[var(--color-white)]/80 sm:rounded-2xl sm:p-5"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-roc-accent)]/10 transition-colors group-hover:bg-[var(--color-roc-accent)]/20 sm:h-14 sm:w-14">
+                      <Keyboard size={28} weight="fill" className="text-[var(--color-roc-accent)]" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="mb-0.5 text-base font-semibold text-[var(--color-text-dark)] sm:text-lg">
+                        Digitar Código
+                      </h3>
+                      <p className="text-xs text-[var(--color-text-medium)] sm:text-sm">
+                        Insira o código manualmente
+                      </p>
+                    </div>
+                    <div className="hidden text-[var(--color-roc-accent)] opacity-0 transition-opacity group-hover:opacity-100 sm:block">
+                      →
+                    </div>
+              </div>
+            </button>
+          </div>
+
+              {/* Texto de Ajuda */}
+              <p className="px-4 text-center text-xs text-white/50 sm:text-sm">
+                O cupom será marcado como utilizado automaticamente após a validação
               </p>
             </div>
-          ) : (
-            <form onSubmit={handleValidateCPF} className="space-y-4">
-              <div className="space-y-1 text-sm">
-                <label
-                  htmlFor="cpf"
-                  className="flex items-center gap-2 font-medium text-[var(--color-text-dark)]"
-                >
-                  <IdentificationCard
-                    size={16}
-                    weight="fill"
-                    className="text-[var(--color-text-medium)]"
-                  />
-                  CPF do cliente
-                </label>
-                <input
-                  id="cpf"
-                  type="text"
-                  maxLength={14}
-                  placeholder="000.000.000-00"
-                  value={formData.cpf}
-                  onChange={(e) => {
-                    const formatted = formatCPF(e.target.value);
-                    setFormData({ ...formData, cpf: formatted });
-                  }}
-                  className="w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[var(--color-roc-primary)] focus:ring-1 focus:ring-[var(--color-roc-primary)]"
-                  required
-                />
-              </div>
+          )}
+
+          {/* Manual Input Mode */}
+          {mode === "manual" && validationStatus === "idle" && (
+            <div className="rounded-2xl bg-[var(--color-white)] p-6 shadow-large sm:rounded-3xl sm:p-8">
               <button
-                type="submit"
-                className="w-full rounded-lg bg-[var(--color-roc-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-white)] hover:bg-[var(--color-roc-primary-dark)]"
+                onClick={() => setMode("choice")}
+                className="mb-6 flex items-center gap-2 text-sm text-[var(--color-text-medium)] transition-colors hover:text-[var(--color-text-dark)]"
               >
-                Buscar voucher
+                <ArrowLeft size={16} weight="bold" />
+                Voltar
               </button>
-            </form>
+
+              <div className="mb-6 text-center sm:mb-8">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--color-roc-accent)]/10 sm:h-16 sm:w-16">
+                  <Keyboard size={28} weight="fill" className="text-[var(--color-roc-accent)]" />
+                </div>
+                <h1 className="mb-2 text-xl font-bold text-[var(--color-text-dark)] sm:text-2xl">
+                  Digitar Código
+                </h1>
+                <p className="text-sm text-[var(--color-text-medium)]">
+                  Digite o código de 8 caracteres do cupom
+              </p>
+            </div>
+
+              <form onSubmit={handleManualSubmit} className="space-y-4 sm:space-y-5">
+                <div>
+                  <input
+                    type="text"
+                    value={inputCode}
+                    onChange={(e) =>
+                      setInputCode(
+                        e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")
+                      )
+                    }
+                    className="w-full rounded-xl border-2 border-[var(--color-border)] bg-[var(--color-bg-light)] px-4 py-3 text-center text-xl tracking-[0.3em] font-mono uppercase outline-none transition-all focus:border-[var(--color-roc-primary)] focus:ring-2 focus:ring-[var(--color-roc-primary)]/20 sm:px-5 sm:py-4 sm:text-2xl"
+                    placeholder="ROC0001"
+                    maxLength={8}
+                    autoFocus
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck="false"
+                  />
+                  <p className="mt-2 text-center text-xs text-[var(--color-text-medium)]">
+                    {inputCode.length}/8 caracteres
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={inputCode.length !== 8}
+                  className="w-full rounded-xl bg-gradient-to-r from-[var(--color-roc-primary)] to-[var(--color-roc-primary-light)] px-4 py-3 text-sm font-semibold text-[var(--color-white)] shadow-medium transition-all hover:shadow-large disabled:cursor-not-allowed disabled:opacity-50 sm:py-4 sm:text-base"
+                >
+                  Validar Cupom
+                </button>
+              </form>
+            </div>
+          )}
+
+
+          {/* Validating State */}
+          {validationStatus === "validating" && (
+            <div className="rounded-2xl bg-[var(--color-white)] p-8 shadow-large sm:rounded-3xl sm:p-10">
+              <div className="text-center">
+                <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-roc-primary)]/10 sm:mb-6 sm:h-20 sm:w-20">
+                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--color-roc-primary)]/30 border-t-[var(--color-roc-primary)] sm:h-12 sm:w-12" />
+                </div>
+                <h2 className="mb-2 text-lg font-bold text-[var(--color-text-dark)] sm:text-xl">
+                  Validando...
+                </h2>
+                <p className="text-sm text-[var(--color-text-medium)]">Verificando o código do cupom</p>
+              </div>
+            </div>
+          )}
+
+          {/* Success State */}
+          {validationStatus === "success" && (
+            <div className="animate-scale-in rounded-2xl border-2 border-[var(--color-roc-success)]/50 bg-gradient-to-br from-[var(--color-roc-success)]/20 to-[var(--color-roc-success)]/10 p-6 shadow-large sm:rounded-3xl sm:p-8">
+              <div className="text-center">
+                <div
+                  className="mx-auto mb-5 flex h-18 w-18 items-center justify-center rounded-full bg-[var(--color-roc-success)] shadow-medium sm:mb-6 sm:h-20 sm:w-20"
+                  style={{
+                    boxShadow: "0 0 40px rgba(34, 139, 34, 0.4)",
+                  }}
+                >
+                  <CheckCircle size={36} weight="fill" className="text-[var(--color-white)] sm:w-10 sm:h-10" />
+                </div>
+
+                <h1 className="mb-2 text-xl font-bold text-[var(--color-roc-success)] sm:text-2xl">
+                  Cupom Validado!
+                </h1>
+                <p className="mb-6 text-sm text-[var(--color-text-medium)]">
+                  O cupom foi utilizado com sucesso
+                </p>
+
+                {couponInfo && (
+                  <div className="mb-6 space-y-3 rounded-xl bg-[var(--color-white)]/80 p-4 text-left backdrop-blur-sm sm:space-y-4 sm:rounded-2xl sm:p-5">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--color-roc-primary)]/10 sm:h-10 sm:w-10">
+                        <Storefront size={16} weight="fill" className="text-[var(--color-roc-primary)]" />
+                      </div>
+                      <div>
+                        <p className="mb-1 text-xs text-[var(--color-text-medium)]">Restaurante</p>
+                        <p className="text-sm font-medium text-[var(--color-text-dark)] sm:text-base">
+                          {couponInfo.restaurant}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--color-roc-accent)]/10 sm:h-10 sm:w-10">
+                        <Tag size={16} weight="fill" className="text-[var(--color-roc-accent)]" />
+                      </div>
+                      <div>
+                        <p className="mb-1 text-xs text-[var(--color-text-medium)]">Oferta</p>
+                        <p className="text-sm font-medium text-[var(--color-text-dark)] sm:text-base">
+                          {couponInfo.offer}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--color-roc-success)]/10 sm:h-10 sm:w-10">
+                        <Clock size={16} weight="fill" className="text-[var(--color-roc-success)]" />
+                      </div>
+                      <div>
+                        <p className="mb-1 text-xs text-[var(--color-text-medium)]">Validado em</p>
+                        <p className="text-sm font-medium text-[var(--color-text-dark)] sm:text-base">
+                          {new Date().toLocaleString("pt-BR", {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleReset}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-white)] px-5 py-2.5 text-sm font-medium text-[var(--color-text-dark)] transition-colors hover:bg-[var(--color-bg-light)] sm:px-6 sm:py-3 sm:text-base"
+                >
+                  <ArrowClockwise size={16} weight="bold" />
+                  Validar outro cupom
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Error State */}
+          {validationStatus === "error" && (
+            <div className="animate-scale-in rounded-2xl border-2 border-[var(--color-roc-danger)]/50 bg-gradient-to-br from-[var(--color-roc-danger)]/20 to-[var(--color-roc-danger)]/10 p-6 shadow-large sm:rounded-3xl sm:p-8">
+              <div className="text-center">
+                <div className="mx-auto mb-5 flex h-18 w-18 items-center justify-center rounded-full bg-[var(--color-roc-danger)] sm:mb-6 sm:h-20 sm:w-20">
+                  <XCircle size={36} weight="fill" className="text-[var(--color-white)] sm:w-10 sm:h-10" />
+                </div>
+
+                <h1 className="mb-2 text-xl font-bold text-[var(--color-roc-danger)] sm:text-2xl">
+                  Cupom Inválido
+                </h1>
+
+                <p className="mx-auto mb-6 max-w-xs text-sm text-[var(--color-text-medium)]">
+                  O código informado não foi encontrado ou já foi utilizado anteriormente.
+                </p>
+
+                <div className="mb-6 rounded-xl bg-[var(--color-white)]/80 p-4 backdrop-blur-sm">
+                  <p className="mb-1 text-xs text-[var(--color-text-medium)]">Código digitado:</p>
+                  <p className="font-mono text-lg tracking-wider text-[var(--color-text-dark)]">
+                    {inputCode || "—"}
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3 justify-center sm:flex-row">
+              <button
+                    onClick={handleReset}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-white)] px-5 py-2.5 text-sm font-medium text-[var(--color-text-dark)] transition-colors hover:bg-[var(--color-bg-light)]"
+              >
+                    <ArrowClockwise size={16} weight="bold" />
+                    Tentar novamente
+              </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
-      </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-white/10 py-3 text-center sm:py-4">
+        <p className="text-xs text-white/50 sm:text-sm">
+          © 2026 ROC Passaporte — Portal do Lojista. Todos os direitos reservados.
+        </p>
+      </footer>
     </div>
   );
 }

@@ -1,32 +1,36 @@
 @import "tailwindcss";
 
 :root {
-  --background: #F8F9FA;
+  --background: #f8f9fa;
   --foreground: #333333;
 
+  /* Cores Primárias e de Ação - ROC */
   --color-roc-primary: #0056b3;
   --color-roc-primary-light: #337ab7;
   --color-roc-primary-dark: #003d80;
-  --color-roc-accent: #FFD700;
-  --color-roc-success: #228B22;
+  --color-roc-accent: #ffd700;
+  --color-roc-success: #228b22;
   --color-roc-danger: #dc3545;
 
+  /* Cores Neutras */
   --color-white: #ffffff;
   --color-text-dark: #333333;
   --color-text-medium: #6c757d;
-  --color-bg-light: #F8F9FA;
+  --color-bg-light: #f8f9fa;
   --color-border: #dee2e6;
 
-  --font-family-primary: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
+  /* Tipografia */
+  --font-family-primary: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
 
-  --spacing-1: 0.25rem;
-  --spacing-2: 0.5rem;
-  --spacing-3: 1rem;
-  --spacing-4: 1.5rem;
-  --spacing-5: 2rem;
-  --spacing-6: 3rem;
-  --spacing-7: 4rem;
+  /* Espaçamento (Base 8px) */
+  --spacing-1: 0.25rem; /* 4px */
+  --spacing-2: 0.5rem; /* 8px */
+  --spacing-3: 1rem; /* 16px */
+  --spacing-4: 1.5rem; /* 24px */
+  --spacing-5: 2rem; /* 32px */
+  --spacing-6: 3rem; /* 48px */
+  --spacing-7: 4rem; /* 64px */
 }
 
 @theme inline {
@@ -36,15 +40,77 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Shadows - Design System */
+.shadow-soft {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.shadow-medium {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.shadow-large {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-bg-light);
+  color: var(--color-text-dark);
   font-family: var(--font-family-primary);
+}
+
+/* Animação de varredura do QR Scanner */
+@keyframes scan {
+  0% {
+    top: 0;
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0.5;
+  }
+}
+
+.animate-scan {
+  animation: scan 2s linear infinite;
+}
+
+/* Estilos para remover blur do html5-qrcode e manter câmera nítida */
+#qr-reader video,
+#qr-reader img {
+  filter: none !important;
+  -webkit-filter: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+}
+
+#qr-reader__dashboard_section_csr {
+  filter: none !important;
+  -webkit-filter: none !important;
+}
+
+#qr-reader__camera_permission_button {
+  filter: none !important;
+  -webkit-filter: none !important;
+}
+
+/* Remover blur da região sombreada */
+#qr-shaded-region,
+#qr-shaded-region * {
+  filter: none !important;
+  -webkit-filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  opacity: 1 !important;
+}
+
+/* Garantir que o vídeo da câmera esteja nítido */
+#qr-reader__dashboard,
+#qr-reader__dashboard *,
+#qr-reader__camera_selection {
+  filter: none !important;
+  -webkit-filter: none !important;
 }
