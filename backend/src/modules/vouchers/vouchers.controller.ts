@@ -1,51 +1,93 @@
-import { Controller, Get, Param, Post, Req } from "@nestjs/common";
-import { Request } from "express";
+import { Controller, Get, Param, Post, UseGuards, BadRequestException } from "@nestjs/common";
 import { VouchersService } from "./vouchers.service";
-
-interface AuthenticatedRequest extends Request {
-  userId?: number;
-}
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { CurrentUser, CurrentUserData } from "../auth/current-user.decorator";
 
 @Controller("vouchers")
+@UseGuards(JwtAuthGuard)
 export class VouchersController {
   constructor(private readonly vouchersService: VouchersService) {}
 
-  private getUserIdFromRequest(req: AuthenticatedRequest): number {
-    const header = req.header("x-user-id");
-    if (!header) {
-      throw new Error("Cabeçalho x-user-id é obrigatório");
-    }
-    const value = Number(header);
-    if (!Number.isInteger(value) || value <= 0) {
-      throw new Error("x-user-id inválido");
-    }
-    return value;
-  }
-
   @Get()
-  listForCurrentUser(@Req() req: AuthenticatedRequest) {
-    const userId = this.getUserIdFromRequest(req);
-    return this.vouchersService.listForUser(userId);
+  async listForCurrentUser(@CurrentUser() user: CurrentUserData) {
+    const vouchers = await this.vouchersService.listForUser(user.id);
+
+    // Formatar resposta para manter compatibilidade com frontend
+    return vouchers.map((voucher) => ({
+      id: voucher.id,
+      code: voucher.code,
+      status: voucher.status,
+      used: voucher.status === "used",
+      usedAt: voucher.used_at,
+      createdAt: voucher.created_at,
+      expiresAt: voucher.expires_at,
+      restaurantName: voucher.restaurant.name,
+      city: voucher.restaurant.city,
+      discountLabel: voucher.restaurant.discount_label,
+      imageUrl: voucher.restaurant.image_url,
+      category: voucher.restaurant.category,
+      restaurant: {
+        id: voucher.restaurant.id,
+        name: voucher.restaurant.name,
+        city: voucher.restaurant.city,
+        discountLabel: voucher.restaurant.discount_label,
+        imageUrl: voucher.restaurant.image_url,
+        category: voucher.restaurant.category,
+      },
+    }));
   }
 
   @Get(":id")
-  getOne(@Req() req: AuthenticatedRequest, @Param("id") id: string) {
-    const userId = this.getUserIdFromRequest(req);
-    const voucherId = Number(id);
-    if (!Number.isInteger(voucherId) || voucherId <= 0) {
-      throw new Error("ID do voucher inválido");
+  async getOne(@CurrentUser() user: CurrentUserData, @Param("id") id: string) {
+    // Validar UUID
+    if (!id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      throw new BadRequestException("ID do voucher inválido");
     }
-    return this.vouchersService.findForUser(userId, voucherId);
+
+    const voucher = await this.vouchersService.findForUser(user.id, id);
+
+    return {
+      id: voucher.id,
+      code: voucher.code,
+      status: voucher.status,
+      used: voucher.status === "used",
+      usedAt: voucher.used_at,
+      createdAt: voucher.created_at,
+      expiresAt: voucher.expires_at,
+      restaurantName: voucher.restaurant.name,
+      city: voucher.restaurant.city,
+      discountLabel: voucher.restaurant.discount_label,
+      imageUrl: voucher.restaurant.image_url,
+      category: voucher.restaurant.category,
+      restaurant: {
+        id: voucher.restaurant.id,
+        name: voucher.restaurant.name,
+        city: voucher.restaurant.city,
+        discountLabel: voucher.restaurant.discount_label,
+        imageUrl: voucher.restaurant.image_url,
+        category: voucher.restaurant.category,
+      },
+    };
   }
 
   @Post(":id/use")
-  use(@Req() req: AuthenticatedRequest, @Param("id") id: string) {
-    const userId = this.getUserIdFromRequest(req);
-    const voucherId = Number(id);
-    if (!Number.isInteger(voucherId) || voucherId <= 0) {
-      throw new Error("ID do voucher inválido");
+  async use(@CurrentUser() user: CurrentUserData, @Param("id") id: string) {
+    // Validar UUID
+    if (!id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      throw new BadRequestException("ID do voucher inválido");
     }
-    return this.vouchersService.useVoucher(userId, voucherId);
+
+    const voucher = await this.vouchersService.useVoucher(user.id, id);
+
+    return {
+      id: voucher.id,
+      code: voucher.code,
+      status: voucher.status,
+      used: voucher.status === "used",
+      usedAt: voucher.used_at,
+      restaurantName: voucher.restaurant.name,
+      city: voucher.restaurant.city,
+      discountLabel: voucher.restaurant.discount_label,
+    };
   }
 }
-

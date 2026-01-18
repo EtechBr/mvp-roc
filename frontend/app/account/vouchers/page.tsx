@@ -35,26 +35,30 @@ export default function VouchersPage() {
 
         // Obter token do localStorage (cliente)
         const token = localStorage.getItem("auth_token");
-        const userId = localStorage.getItem("user_id");
 
-        const headers: HeadersInit = {
+        if (!token) {
+          // Redirecionar para login se não há token
+          window.location.href = "/auth/login";
+          return;
+        }
+
+        const headers: Record<string, string> = {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         };
-
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-
-        if (userId) {
-          headers["x-user-id"] = userId;
-        }
 
         const response = await fetch("/api/vouchers", {
           headers,
         });
 
         if (!response.ok) {
-          throw new Error("Erro ao carregar vouchers");
+          const errorData = await response.json().catch(() => ({}));
+          if (response.status === 401) {
+            // Redirecionar para login se não autenticado
+            window.location.href = "/auth/login";
+            return;
+          }
+          throw new Error(errorData.error || "Erro ao carregar vouchers");
         }
 
         const data = await response.json();

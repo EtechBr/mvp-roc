@@ -196,7 +196,7 @@ const restaurants: Restaurant[] = [
     name: "Cantina Mexicana",
     city: "Ariquemes",
     discount: "15% OFF",
-    image: "https://images.unsplash.com/photo-1597838816882-4435b1977fbe?w=400&h=300&fit=crop&q=80",
+    image: "https://images.unsplash.com/photo-1504544750208-dc0358e63f7f?w=400&h=300&fit=crop&q=80",
     category: "Mexicana",
   },
   {

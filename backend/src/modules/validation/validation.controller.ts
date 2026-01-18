@@ -1,8 +1,8 @@
-import { Body, Controller, Post } from "@nestjs/common";
+import { Body, Controller, Post, BadRequestException } from "@nestjs/common";
 import { ValidationService } from "./validation.service";
 
 class ValidateVoucherDto {
-  cpf?: string; // Opcional - para validação no restaurante
+  cpf?: string;
   code!: string;
 }
 
@@ -11,16 +11,16 @@ export class ValidationController {
   constructor(private readonly validationService: ValidationService) {}
 
   @Post()
-  validate(@Body() body: ValidateVoucherDto) {
+  async validate(@Body() body: ValidateVoucherDto) {
     if (!body.code) {
-      throw new Error("Código do voucher é obrigatório");
+      throw new BadRequestException("Código do voucher é obrigatório");
     }
 
     // Se CPF fornecido, usar validação com usuário
     if (body.cpf) {
       return this.validationService.validateVoucher({
         cpf: body.cpf,
-        code: body.code
+        code: body.code,
       });
     }
 
@@ -28,4 +28,3 @@ export class ValidationController {
     return this.validationService.validateVoucherByCode(body.code);
   }
 }
-

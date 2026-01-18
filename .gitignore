@@ -129,5 +129,16 @@ temp/
 uploads/
 public/uploads/
 
+# Secrets and credentials
+*.pem
+*.key
+*.crt
+secrets/
+credentials/
+**/secrets.*
+**/*.secret
+service-account*.json
+
+
 
 

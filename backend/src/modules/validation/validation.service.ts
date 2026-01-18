@@ -14,76 +14,97 @@ export class ValidationService {
     private readonly vouchersService: VouchersService
   ) {}
 
-  validateVoucher(input: ValidateVoucherInput) {
-    const user = this.usersService.findByCpf(input.cpf);
+  async validateVoucher(input: ValidateVoucherInput) {
+    const user = await this.usersService.findByCpf(input.cpf);
     if (!user) {
       throw new BadRequestException("Cliente não encontrado para este CPF");
     }
 
-    const voucherId = Number(input.code);
-    if (!Number.isInteger(voucherId) || voucherId <= 0) {
-      throw new BadRequestException("Código de voucher inválido");
+    // Buscar voucher pelo código
+    const voucher = await this.vouchersService.findByCode(input.code);
+
+    if (!voucher) {
+      throw new BadRequestException("Voucher não encontrado");
     }
 
-    const voucher = this.vouchersService.findForUser(user.id, voucherId);
+    // Verificar se o voucher pertence ao usuário
+    if (voucher.profile_id !== user.id) {
+      throw new BadRequestException("Este voucher não pertence ao CPF informado");
+    }
 
-    if (voucher.used) {
+    if (voucher.status === "used") {
       throw new BadRequestException("Voucher já foi utilizado");
     }
 
-    this.vouchersService.useVoucher(user.id, voucher.id);
+    if (voucher.status === "expired") {
+      throw new BadRequestException("Voucher expirado");
+    }
+
+    // Marcar voucher como usado
+    await this.vouchersService.useVoucherByCode(voucher.code);
 
     return {
       message: "Voucher validado com sucesso",
       voucher: {
         id: voucher.id,
-        restaurantName: voucher.restaurantName,
-        city: voucher.city
+        code: voucher.code,
+        restaurantName: voucher.restaurant.name,
+        city: voucher.restaurant.city,
+        discountLabel: voucher.restaurant.discount_label,
       },
       customer: {
         id: user.id,
-        name: user.name,
-        cpf: user.cpf
-      }
+        name: user.full_name,
+        cpf: user.cpf,
+      },
     };
   }
 
-  validateVoucherByCode(code: string) {
-    // Extrair ID numérico do código (ex: "ROC-12345" -> 12345 ou "12345" -> 12345)
-    const codeMatch = code.replace(/[^0-9]/g, "");
-    const voucherId = Number(codeMatch);
-    
-    if (!Number.isInteger(voucherId) || voucherId <= 0) {
-      throw new BadRequestException("Código de voucher inválido");
+  async validateVoucherByCode(code: string) {
+    // Normalizar código
+    const normalizedCode = code.toUpperCase().trim();
+
+    // Validar formato do código
+    if (!normalizedCode.match(/^ROC-[A-Z0-9]{5}$/)) {
+      throw new BadRequestException("Formato de código inválido. Use ROC-XXXXX");
     }
 
-    // Buscar voucher por ID
-    const voucher = this.vouchersService.findById(voucherId);
-    
+    // Buscar voucher por código
+    const voucher = await this.vouchersService.findByCode(normalizedCode);
+
     if (!voucher) {
       throw new BadRequestException("Voucher não encontrado");
     }
 
-    if (voucher.used) {
+    if (voucher.status === "used") {
       throw new BadRequestException("Voucher já foi utilizado");
     }
 
-    // Usar voucher por ID
-    this.vouchersService.useVoucherById(voucher.id);
+    if (voucher.status === "expired") {
+      throw new BadRequestException("Voucher expirado");
+    }
+
+    // Usar voucher
+    const usedVoucher = await this.vouchersService.useVoucherByCode(normalizedCode);
 
     return {
       valid: true,
       message: "Voucher validado com sucesso",
       voucher: {
-        id: voucher.id,
-        code: `ROC-${String(voucher.id).padStart(5, "0")}`,
+        id: usedVoucher.id,
+        code: usedVoucher.code,
         restaurant: {
-          name: voucher.restaurantName,
-          city: voucher.city,
-          offer: "Desconto válido"
-        }
-      }
+          name: usedVoucher.restaurant.name,
+          city: usedVoucher.restaurant.city,
+          offer: usedVoucher.restaurant.discount_label,
+        },
+      },
+      customer: voucher.profile
+        ? {
+            name: voucher.profile.full_name,
+            cpf: voucher.profile.cpf,
+          }
+        : null,
     };
   }
 }
-

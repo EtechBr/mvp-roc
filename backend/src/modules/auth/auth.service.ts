@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
-import { UsersService } from "../../modules/users/users.service";
+import { JwtService } from "@nestjs/jwt";
+import { UsersService } from "../users/users.service";
 
 interface RegisterInput {
   name: string;
@@ -13,39 +14,81 @@ interface LoginInput {
   password: string;
 }
 
+export interface JwtPayload {
+  sub: string; // profile id
+  email: string;
+  name: string;
+}
+
 @Injectable()
 export class AuthService {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService
+  ) {}
 
-  register(input: RegisterInput) {
-    const user = this.usersService.createUser(input);
+  async register(input: RegisterInput) {
+    const profile = await this.usersService.createUser(input);
+
+    const payload: JwtPayload = {
+      sub: profile.id,
+      email: profile.email || "",
+      name: profile.full_name || "",
+    };
+
+    const token = this.jwtService.sign(payload);
+
     return {
       user: {
-        id: user.id,
-        name: user.name,
-        cpf: user.cpf,
-        email: user.email
+        id: profile.id,
+        name: profile.full_name,
+        cpf: profile.cpf,
+        email: profile.email,
       },
-      token: `mock-token-${user.id}`
+      token,
     };
   }
 
-  login(input: LoginInput) {
-    const user = this.usersService.findByEmail(input.email);
+  async login(input: LoginInput) {
+    const profile = await this.usersService.findByEmail(input.email);
 
-    if (!user || user.password !== input.password) {
+    if (!profile || !profile.password_hash) {
       throw new UnauthorizedException("Credenciais inválidas");
     }
 
+    const isPasswordValid = await this.usersService.validatePassword(
+      input.password,
+      profile.password_hash
+    );
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException("Credenciais inválidas");
+    }
+
+    const payload: JwtPayload = {
+      sub: profile.id,
+      email: profile.email || "",
+      name: profile.full_name || "",
+    };
+
+    const token = this.jwtService.sign(payload);
+
     return {
       user: {
-        id: user.id,
-        name: user.name,
-        cpf: user.cpf,
-        email: user.email
+        id: profile.id,
+        name: profile.full_name,
+        cpf: profile.cpf,
+        email: profile.email,
       },
-      token: `mock-token-${user.id}`
+      token,
     };
   }
-}
 
+  async validateToken(token: string): Promise<JwtPayload | null> {
+    try {
+      return this.jwtService.verify<JwtPayload>(token);
+    } catch {
+      return null;
+    }
+  }
+}

@@ -4,38 +4,36 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:300
 
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const voucherId = context.params.id;
-    const numVoucherId = parseInt(voucherId, 10);
+    const params = await context.params;
+    const voucherId = params.id;
 
-    if (isNaN(numVoucherId) || numVoucherId <= 0) {
+    // Validar UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(voucherId)) {
       return NextResponse.json(
         { error: "ID de voucher inválido." },
         { status: 400 }
       );
     }
 
-    // Obter token do header Authorization
     const authHeader = request.headers.get("authorization");
-    const userIdHeader = request.headers.get("x-user-id");
-    const userId = userIdHeader ? parseInt(userIdHeader, 10) : null;
+
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: "Não autenticado. Faça login primeiro." },
+        { status: 401 }
+      );
+    }
 
     const headers: HeadersInit = {
       "Content-Type": "application/json",
+      Authorization: authHeader,
     };
 
-    if (authHeader) {
-      headers["Authorization"] = authHeader;
-    }
-
-    if (userId) {
-      headers["x-user-id"] = userId.toString();
-    }
-
-    // Fazer requisição ao backend
-    const response = await fetch(`${BACKEND_URL}/vouchers/${numVoucherId}`, {
+    const response = await fetch(`${BACKEND_URL}/vouchers/${voucherId}`, {
       method: "GET",
       headers,
     });
@@ -48,19 +46,23 @@ export async function GET(
       );
     }
 
-    const backendVoucher = await response.json();
+    const voucher = await response.json();
 
-    // Adaptar resposta do backend para formato esperado pelo frontend
     return NextResponse.json({
-      id: backendVoucher.id.toString(),
-      code: `ROC-${String(backendVoucher.id).padStart(5, "0")}`,
-      used: backendVoucher.used || false,
+      id: voucher.id,
+      code: voucher.code,
+      used: voucher.used || voucher.status === "used",
+      status: voucher.status,
+      usedAt: voucher.usedAt,
+      createdAt: voucher.createdAt,
+      expiresAt: voucher.expiresAt,
       restaurant: {
-        name: backendVoucher.restaurantName,
-        city: backendVoucher.city,
-        discount: "10% OFF", // Valor padrão - pode ser melhorado no backend
-        imageUrl: null, // Pode ser melhorado no backend
-        category: null, // Pode ser melhorado no backend
+        id: voucher.restaurant?.id,
+        name: voucher.restaurantName || voucher.restaurant?.name,
+        city: voucher.city || voucher.restaurant?.city,
+        discount: voucher.discountLabel || voucher.restaurant?.discountLabel || "10% OFF",
+        imageUrl: voucher.imageUrl || voucher.restaurant?.imageUrl || null,
+        category: voucher.category || voucher.restaurant?.category || null,
       },
     });
   } catch (error: any) {
@@ -71,4 +73,3 @@ export async function GET(
     );
   }
 }
-

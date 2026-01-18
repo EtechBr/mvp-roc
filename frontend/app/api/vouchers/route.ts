@@ -1,69 +1,22 @@
 import { NextResponse } from "next/server";
-import { apiClient } from "@/app/lib/api";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
-// Função auxiliar para gerar código de voucher
-function generateVoucherCode(id: number): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  const suffix = String(id).padStart(5, "0").slice(0, 5);
-  return `ROC-${suffix}`;
-}
-
-// Função para adaptar dados do backend para formato esperado pelo frontend
-function adaptBackendVouchers(backendVouchers: any[], userId: number, userName?: string) {
-  return {
-    profile: userName ? { name: userName } : undefined,
-    vouchers: backendVouchers.map((voucher) => ({
-      id: voucher.id.toString(),
-      code: generateVoucherCode(voucher.id),
-      restaurantName: voucher.restaurantName,
-      city: voucher.city,
-      discountLabel: "10% OFF", // Valor padrão - pode ser melhorado no backend
-      used: voucher.used || false,
-      imageUrl: null, // Pode ser melhorado no backend
-    })),
-  };
-}
-
 export async function GET(request: Request) {
   try {
-    // Obter token do header Authorization
     const authHeader = request.headers.get("authorization");
-    
-    // Tentar obter userId do token ou header
-    let userId: number | null = null;
-    if (authHeader) {
-      // Extrair userId do token (implementação básica - em produção usar JWT)
-      try {
-        const userIdHeader = request.headers.get("x-user-id");
-        if (userIdHeader) {
-          userId = parseInt(userIdHeader, 10);
-        }
-      } catch {
-        // Ignorar se não conseguir extrair
-      }
-    }
 
-    if (!userId && !authHeader) {
+    if (!authHeader) {
       return NextResponse.json(
         { error: "Não autenticado. Faça login primeiro." },
         { status: 401 }
       );
     }
 
-    // Fazer requisição ao backend
     const headers: HeadersInit = {
       "Content-Type": "application/json",
+      Authorization: authHeader,
     };
-
-    if (authHeader) {
-      headers["Authorization"] = authHeader;
-    }
-
-    if (userId) {
-      headers["x-user-id"] = userId.toString();
-    }
 
     const response = await fetch(`${BACKEND_URL}/vouchers`, {
       method: "GET",
@@ -72,15 +25,28 @@ export async function GET(request: Request) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: "Erro desconhecido" }));
-      throw new Error(errorData.message || "Erro ao buscar vouchers");
+      return NextResponse.json(
+        { error: errorData.message || "Erro ao buscar vouchers" },
+        { status: response.status }
+      );
     }
 
-    const backendVouchers = await response.json();
+    const vouchers = await response.json();
 
-    // Adaptar dados do backend para formato esperado pelo frontend
-    const adapted = adaptBackendVouchers(backendVouchers, userId || 0);
-
-    return NextResponse.json(adapted);
+    return NextResponse.json({
+      vouchers: vouchers.map((v: any) => ({
+        id: v.id,
+        code: v.code,
+        restaurantName: v.restaurantName,
+        city: v.city,
+        discountLabel: v.discountLabel || "10% OFF",
+        used: v.used || v.status === "used",
+        imageUrl: v.imageUrl || null,
+        category: v.category || null,
+        status: v.status,
+        restaurant: v.restaurant,
+      })),
+    });
   } catch (error: any) {
     console.error("Erro ao listar vouchers:", error);
     return NextResponse.json(
@@ -89,4 +55,3 @@ export async function GET(request: Request) {
     );
   }
 }
-

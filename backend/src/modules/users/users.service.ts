@@ -1,11 +1,18 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Inject, NotFoundException, ConflictException } from "@nestjs/common";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { SUPABASE_CLIENT } from "../../config/supabase.config";
+import * as bcrypt from "bcrypt";
 
-export interface User {
-  id: number;
-  name: string;
-  cpf: string;
-  email: string;
-  password: string;
+export interface Profile {
+  id: string;
+  user_id: string | null;
+  full_name: string | null;
+  email: string | null;
+  cpf: string | null;
+  city: string | null;
+  created_at: string;
+  updated_at: string;
+  password_hash?: string;
 }
 
 export interface CreateUserInput {
@@ -17,44 +24,98 @@ export interface CreateUserInput {
 
 @Injectable()
 export class UsersService {
-  private users: User[] = [];
-  private nextId = 1;
+  constructor(
+    @Inject(SUPABASE_CLIENT) private readonly supabase: SupabaseClient
+  ) {}
 
-  createUser(input: CreateUserInput): User {
-    const existing = this.users.find(
-      (user) => user.email === input.email || user.cpf === input.cpf
-    );
+  async createUser(input: CreateUserInput): Promise<Profile> {
+    // Verificar se já existe usuário com mesmo email ou CPF
+    const { data: existingByEmail } = await this.supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", input.email)
+      .single();
 
-    if (existing) {
-      throw new Error("Usuário com este e-mail ou CPF já existe");
+    if (existingByEmail) {
+      throw new ConflictException("Usuário com este e-mail já existe");
     }
 
-    const user: User = {
-      id: this.nextId++,
-      name: input.name,
-      cpf: input.cpf,
-      email: input.email,
-      password: input.password
-    };
+    const { data: existingByCpf } = await this.supabase
+      .from("profiles")
+      .select("id")
+      .eq("cpf", input.cpf)
+      .single();
 
-    this.users.push(user);
-    return user;
+    if (existingByCpf) {
+      throw new ConflictException("Usuário com este CPF já existe");
+    }
+
+    // Hash da senha com bcrypt
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(input.password, saltRounds);
+
+    // Criar profile
+    const { data: profile, error } = await this.supabase
+      .from("profiles")
+      .insert({
+        full_name: input.name,
+        email: input.email,
+        cpf: input.cpf,
+        password_hash: passwordHash,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Erro ao criar usuário: ${error.message}`);
+    }
+
+    return profile;
   }
 
-  findByEmail(email: string): User | undefined {
-    return this.users.find((user) => user.email === email);
+  async findByEmail(email: string): Promise<Profile | null> {
+    const { data, error } = await this.supabase
+      .from("profiles")
+      .select("*")
+      .eq("email", email)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data;
   }
 
-  findByCpf(cpf: string): User | undefined {
-    return this.users.find((user) => user.cpf === cpf);
+  async findByCpf(cpf: string): Promise<Profile | null> {
+    const { data, error } = await this.supabase
+      .from("profiles")
+      .select("*")
+      .eq("cpf", cpf)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data;
   }
 
-  findById(id: number): User {
-    const user = this.users.find((u) => u.id === id);
-    if (!user) {
+  async findById(id: string): Promise<Profile> {
+    const { data, error } = await this.supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !data) {
       throw new NotFoundException("Usuário não encontrado");
     }
-    return user;
+
+    return data;
+  }
+
+  async validatePassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
+    return bcrypt.compare(plainPassword, hashedPassword);
   }
 }
-

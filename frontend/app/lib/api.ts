@@ -9,6 +9,38 @@ export interface ApiError {
   status?: number;
 }
 
+export interface User {
+  id: string;
+  name: string | null;
+  cpf: string | null;
+  email: string | null;
+}
+
+export interface Restaurant {
+  id: number;
+  name: string;
+  city: string;
+  discountLabel: string;
+  imageUrl: string | null;
+  category: string | null;
+}
+
+export interface Voucher {
+  id: string;
+  code: string;
+  status: "available" | "used" | "expired";
+  used: boolean;
+  usedAt: string | null;
+  createdAt: string;
+  expiresAt: string | null;
+  restaurantName: string;
+  city: string;
+  discountLabel: string;
+  imageUrl: string | null;
+  category: string | null;
+  restaurant: Restaurant;
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -21,19 +53,18 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const token = this.getToken();
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      ...options.headers,
     };
+
+    // Merge existing headers if any
+    if (options.headers) {
+      const existingHeaders = options.headers as Record<string, string>;
+      Object.assign(headers, existingHeaders);
+    }
 
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    // Adicionar user-id do token se disponível
-    const userId = this.getUserId();
-    if (userId) {
-      headers["x-user-id"] = userId.toString();
     }
 
     try {
@@ -42,11 +73,29 @@ class ApiClient {
         headers,
       });
 
-      const data = await response.json();
+      let data: any;
+      const contentType = response.headers.get("content-type");
+
+      try {
+        if (contentType && contentType.includes("application/json")) {
+          data = await response.json();
+        } else {
+          const text = await response.text();
+          data = text ? { message: text, error: text } : { message: "Erro na requisição" };
+        }
+      } catch (parseError) {
+        data = { message: "Erro ao processar resposta do servidor", error: "Parse error" };
+      }
 
       if (!response.ok) {
+        const errorMessage =
+          data?.message ||
+          data?.error ||
+          data?.toString() ||
+          `Erro ${response.status}: ${response.statusText}`;
+
         throw {
-          message: data.message || data.error || "Erro na requisição",
+          message: errorMessage,
           status: response.status,
         } as ApiError;
       }
@@ -56,19 +105,24 @@ class ApiClient {
       if (error && typeof error === "object" && "message" in error) {
         throw error;
       }
+
+      const errorMessage = error instanceof Error
+        ? error.message
+        : "Erro de conexão com o servidor";
+
       throw {
-        message: "Erro de conexão com o servidor",
+        message: errorMessage,
         status: 0,
       } as ApiError;
     }
   }
 
   // Gerenciamento de Token e User ID
-  setToken(token: string, userId?: number) {
+  setToken(token: string, userId?: string) {
     if (typeof window !== "undefined") {
       localStorage.setItem("auth_token", token);
       if (userId) {
-        localStorage.setItem("user_id", userId.toString());
+        localStorage.setItem("user_id", userId);
       }
     }
   }
@@ -78,10 +132,9 @@ class ApiClient {
     return localStorage.getItem("auth_token");
   }
 
-  getUserId(): number | null {
+  getUserId(): string | null {
     if (typeof window === "undefined") return null;
-    const userId = localStorage.getItem("user_id");
-    return userId ? parseInt(userId, 10) : null;
+    return localStorage.getItem("user_id");
   }
 
   clearAuth() {
@@ -91,10 +144,14 @@ class ApiClient {
     }
   }
 
+  isAuthenticated(): boolean {
+    return !!this.getToken();
+  }
+
   // Auth endpoints
   async login(email: string, password: string) {
     const response = await this.request<{
-      user: { id: number; name: string; cpf: string; email: string };
+      user: User;
       token: string;
     }>("/auth/login", {
       method: "POST",
@@ -113,7 +170,7 @@ class ApiClient {
     passwordConfirmation: string;
   }) {
     const response = await this.request<{
-      user: { id: number; name: string; cpf: string; email: string };
+      user: User;
       token: string;
     }>("/auth/register", {
       method: "POST",
@@ -125,38 +182,51 @@ class ApiClient {
   }
 
   // Vouchers endpoints
-  async getVouchers() {
-    return this.request<any[]>("/vouchers", {
+  async getVouchers(): Promise<Voucher[]> {
+    return this.request<Voucher[]>("/vouchers", {
       method: "GET",
     });
   }
 
-  async getVoucherById(id: number) {
-    return this.request<any>(`/vouchers/${id}`, {
+  async getVoucherById(id: string): Promise<Voucher> {
+    return this.request<Voucher>(`/vouchers/${id}`, {
       method: "GET",
     });
   }
 
-  async useVoucher(id: number) {
-    return this.request<any>(`/vouchers/${id}/use`, {
+  async useVoucher(id: string): Promise<Voucher> {
+    return this.request<Voucher>(`/vouchers/${id}/use`, {
       method: "POST",
     });
   }
 
   // Validation endpoints
-  async validateVoucher(cpf: string, code: string) {
+  async validateVoucher(code: string, cpf?: string) {
     return this.request<{
+      valid?: boolean;
       message: string;
-      voucher: { id: number; restaurantName: string; city: string };
-      customer: { id: number; name: string; cpf: string };
+      voucher: {
+        id: string;
+        code: string;
+        restaurantName?: string;
+        city?: string;
+        discountLabel?: string;
+        restaurant?: {
+          name: string;
+          city: string;
+          offer: string;
+        };
+      };
+      customer?: {
+        id?: string;
+        name: string | null;
+        cpf: string | null;
+      } | null;
     }>("/validation", {
       method: "POST",
-      body: JSON.stringify({ cpf, code }),
+      body: JSON.stringify(cpf ? { cpf, code } : { code }),
     });
   }
 }
 
 export const apiClient = new ApiClient(BACKEND_URL);
-
-
-

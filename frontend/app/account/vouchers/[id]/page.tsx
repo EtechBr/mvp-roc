@@ -11,10 +11,19 @@ interface VoucherDetail {
   code: string;
   used: boolean;
   restaurant: {
+    id?: string;
     name: string;
     city: string;
-    category: string;
-    discount: string;
+    category?: string;
+    discount?: string;
+    imageUrl?: string | null;
+    offer?: {
+      title: string;
+      description: string;
+      rules: string[];
+      validity: string;
+    };
+    logo?: string;
   };
 }
 
@@ -22,18 +31,88 @@ export default function VoucherPage() {
   const params = useParams<{ id: string }>();
   const voucherId = params.id;
 
+  const [voucher, setVoucher] = useState<VoucherDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [showCoupon, setShowCoupon] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Buscar dados do voucher
+  useEffect(() => {
+    const fetchVoucher = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const token = localStorage.getItem("auth_token");
+        const userId = localStorage.getItem("user_id");
+
+        const headers: HeadersInit = {
+          "Content-Type": "application/json",
+        };
+
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
+        if (userId) {
+          headers["x-user-id"] = userId;
+        }
+
+        const response = await fetch(`/api/vouchers/${voucherId}`, {
+          headers,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: "Erro desconhecido" }));
+          throw new Error(errorData.error || "Erro ao carregar voucher");
+        }
+
+        const data = await response.json();
+
+        // Adicionar dados mockados para campos que não vêm da API
+        setVoucher({
+          ...data,
+          restaurant: {
+            ...data.restaurant,
+            category: data.restaurant?.category || "Gastronomia",
+            discount: data.restaurant?.discount || "10% OFF",
+            logo: "🍽️",
+            offer: {
+              title: "Desconto Especial",
+              description: "Aproveite nosso desconto exclusivo para membros do ROC Passaporte.",
+              rules: [
+                "Válido apenas para consumo no local",
+                "Não acumulativo com outras promoções",
+                "Apresentar cupom na hora do pagamento",
+                "Válido de segunda a domingo",
+              ],
+              validity: "Válido até 31/12/2024",
+            },
+          },
+        });
+      } catch (err: any) {
+        setError(err.message || "Erro ao carregar voucher");
+        console.error("Erro ao buscar voucher:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (voucherId) {
+      fetchVoucher();
+    }
+  }, [voucherId]);
+
   // Gerar QR Code quando o cupom for gerado
   useEffect(() => {
-    if (showCoupon) {
+    if (showCoupon && voucher) {
       const qrData = JSON.stringify({
-        code: voucherCode,
-        restaurantId: restaurant.id,
-        restaurantName: restaurant.name,
+        code: voucher.code,
+        restaurantId: voucher.restaurant.id || voucherId,
+        restaurantName: voucher.restaurant.name,
       });
 
       QRCode.toDataURL(qrData, {
@@ -52,7 +131,7 @@ export default function VoucherPage() {
           console.error("Erro ao gerar QR Code:", err);
         });
     }
-  }, [showCoupon, voucherCode, restaurant.id, restaurant.name]);
+  }, [showCoupon, voucher, voucherId]);
 
   const handleGenerateCoupon = () => {
     setIsGenerating(true);
@@ -63,10 +142,45 @@ export default function VoucherPage() {
   };
 
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(voucherCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (voucher?.code) {
+      navigator.clipboard.writeText(voucher.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-light)]">
+        <div className="text-center">
+          <div className="mb-4 text-lg text-[var(--color-text-medium)]">Carregando voucher...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !voucher) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-light)]">
+        <div className="text-center">
+          <div className="mb-4 text-lg text-[var(--color-roc-danger)]">
+            {error || "Voucher não encontrado"}
+          </div>
+          <Link
+            href="/account/vouchers"
+            className="text-[var(--color-roc-primary)] hover:underline"
+          >
+            Voltar aos vouchers
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const voucherCode = voucher.code;
+  const restaurant = voucher.restaurant;
 
   return (
     <div className="min-h-screen bg-[var(--color-bg-light)]">
@@ -85,17 +199,19 @@ export default function VoucherPage() {
             <div className="overflow-hidden rounded-2xl bg-[var(--color-white)] shadow-medium">
               {/* Header com Logo */}
               <div className="flex h-48 items-center justify-center bg-gradient-to-br from-[var(--color-roc-primary-light)]/10 to-[var(--color-roc-accent)]/10">
-                <span className="text-8xl">{restaurant.logo}</span>
+                <span className="text-8xl">{restaurant.logo || "🍽️"}</span>
               </div>
 
               <div className="p-6 md:p-8">
                 {/* Tags de Categoria e Desconto */}
                 <div className="mb-3 flex items-center gap-2">
-                  <span className="rounded-full bg-[var(--color-bg-light)] px-3 py-1 text-xs text-[var(--color-text-medium)]">
-                    {restaurant.category}
-                  </span>
+                  {restaurant.category && (
+                    <span className="rounded-full bg-[var(--color-bg-light)] px-3 py-1 text-xs text-[var(--color-text-medium)]">
+                      {restaurant.category}
+                    </span>
+                  )}
                   <span className="rounded-full bg-[var(--color-roc-primary)]/10 px-3 py-1 text-xs font-medium text-[var(--color-roc-primary)]">
-                    {restaurant.discount} OFF
+                    {restaurant.discount || "10% OFF"}
                   </span>
                 </div>
 
@@ -105,38 +221,42 @@ export default function VoucherPage() {
                 </h1>
 
                 {/* Título da Oferta */}
-                <h2 className="mb-4 text-lg font-medium text-[var(--color-roc-primary)]">
-                  {restaurant.offer.title}
-                </h2>
+                {restaurant.offer && (
+                  <>
+                    <h2 className="mb-4 text-lg font-medium text-[var(--color-roc-primary)]">
+                      {restaurant.offer.title}
+                    </h2>
 
-                {/* Descrição da Oferta */}
-                <p className="mb-6 text-[var(--color-text-medium)]">{restaurant.offer.description}</p>
+                    {/* Descrição da Oferta */}
+                    <p className="mb-6 text-[var(--color-text-medium)]">{restaurant.offer.description}</p>
 
-                {/* Regras da Oferta */}
-                <div className="border-t border-[var(--color-border)] pt-6">
-                  <h3 className="mb-3 font-semibold text-[var(--color-text-dark)]">Regras da oferta:</h3>
-                  <ul className="space-y-2">
-                    {restaurant.offer.rules.map((rule, index) => (
-                      <li
-                        key={index}
-                        className="flex items-start gap-2 text-sm text-[var(--color-text-medium)]"
-                      >
-                        <WarningCircle
-                          size={16}
-                          weight="fill"
-                          className="mt-0.5 flex-shrink-0 text-[var(--color-roc-accent)]"
-                        />
-                        <span>{rule}</span>
-                      </li>
-                    ))}
-                  </ul>
+                    {/* Regras da Oferta */}
+                    <div className="border-t border-[var(--color-border)] pt-6">
+                      <h3 className="mb-3 font-semibold text-[var(--color-text-dark)]">Regras da oferta:</h3>
+                      <ul className="space-y-2">
+                        {restaurant.offer.rules.map((rule, index) => (
+                          <li
+                            key={index}
+                            className="flex items-start gap-2 text-sm text-[var(--color-text-medium)]"
+                          >
+                            <WarningCircle
+                              size={16}
+                              weight="fill"
+                              className="mt-0.5 flex-shrink-0 text-[var(--color-roc-accent)]"
+                            />
+                            <span>{rule}</span>
+                          </li>
+                        ))}
+                      </ul>
 
-                  {/* Validade */}
-                  <div className="mt-4 flex items-center gap-2 text-sm text-[var(--color-text-medium)]">
-                    <Clock size={16} weight="fill" />
-                    <span>{restaurant.offer.validity}</span>
-                  </div>
-                </div>
+                      {/* Validade */}
+                      <div className="mt-4 flex items-center gap-2 text-sm text-[var(--color-text-medium)]">
+                        <Clock size={16} weight="fill" />
+                        <span>{restaurant.offer.validity}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -206,7 +326,7 @@ export default function VoucherPage() {
                     </h2>
 
                     <p className="mb-6 text-[var(--color-text-medium)]">
-                      Gere seu cupom exclusivo e aproveite {restaurant.discount} de desconto!
+                      Gere seu cupom exclusivo e aproveite {restaurant.discount || "10% OFF"} de desconto!
                     </p>
 
                     <button

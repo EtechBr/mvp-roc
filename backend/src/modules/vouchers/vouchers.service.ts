@@ -1,102 +1,285 @@
-import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { UsersService } from "../users/users.service";
+import { Injectable, Inject, NotFoundException, BadRequestException } from "@nestjs/common";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { SUPABASE_CLIENT } from "../../config/supabase.config";
 
 export interface Voucher {
-  id: number;
-  userId: number;
-  restaurantName: string;
-  city: string;
-  used: boolean;
-  usedAt?: Date;
+  id: string;
+  code: string;
+  profile_id: string;
+  user_id: string | null;
+  pass_id: string;
+  restaurant_id: number;
+  status: "available" | "used" | "expired";
+  used_at: string | null;
+  created_at: string;
+  expires_at: string | null;
+  restaurant?: {
+    id: number;
+    name: string;
+    city: string;
+    discount_label: string;
+    image_url: string | null;
+    category: string | null;
+  };
+}
+
+export interface VoucherWithRestaurant extends Voucher {
+  restaurant: {
+    id: number;
+    name: string;
+    city: string;
+    discount_label: string;
+    image_url: string | null;
+    category: string | null;
+  };
 }
 
 @Injectable()
 export class VouchersService {
-  private vouchers: Voucher[] = [];
-  private nextId = 1;
+  constructor(
+    @Inject(SUPABASE_CLIENT) private readonly supabase: SupabaseClient
+  ) {}
 
-  constructor(private readonly usersService: UsersService) {}
-
-  generateVouchersForUser(userId: number) {
-    const user = this.usersService.findById(userId);
-
-    const existing = this.vouchers.filter((voucher) => voucher.userId === user.id);
-    if (existing.length > 0) {
-      return existing;
+  private generateVoucherCode(): string {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let code = "ROC-";
+    for (let i = 0; i < 5; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-
-    const created: Voucher[] = new Array(25).fill(null).map((_, index) => {
-      const id = this.nextId++;
-      const city = index % 5 === 0 ? "Porto Velho" : "Outra cidade";
-
-      return {
-        id,
-        userId: user.id,
-        restaurantName: `Restaurante ${index + 1}`,
-        city,
-        used: false
-      };
-    });
-
-    this.vouchers.push(...created);
-    return created;
+    return code;
   }
 
-  listForUser(userId: number): Voucher[] {
-    this.usersService.findById(userId);
-    const userVouchers = this.vouchers.filter((voucher) => voucher.userId === userId);
-    if (userVouchers.length === 0) {
-      return this.generateVouchersForUser(userId);
+  async generateVouchersForUser(profileId: string): Promise<Voucher[]> {
+    // Verificar se já existe pass para este profile
+    const { data: existingPass } = await this.supabase
+      .from("passes")
+      .select("id")
+      .eq("profile_id", profileId)
+      .eq("status", "active")
+      .single();
+
+    let passId: string;
+
+    // Se não existe pass, criar um
+    if (!existingPass) {
+      const { data: newPass, error: passError } = await this.supabase
+        .from("passes")
+        .insert({
+          profile_id: profileId,
+          status: "active",
+          valid_from: new Date().toISOString().split("T")[0],
+        })
+        .select()
+        .single();
+
+      if (passError || !newPass) {
+        throw new Error(`Erro ao criar passaporte: ${passError?.message || "Pass não criado"}`);
+      }
+
+      passId = newPass.id;
+    } else {
+      passId = existingPass.id;
     }
-    return userVouchers;
+
+    // Verificar se já existem vouchers para este pass
+    const { data: existingVouchers } = await this.supabase
+      .from("vouchers")
+      .select("*, restaurant:restaurants(*)")
+      .eq("pass_id", passId);
+
+    if (existingVouchers && existingVouchers.length > 0) {
+      return existingVouchers;
+    }
+
+    // Buscar restaurantes ativos
+    const { data: restaurants, error: restError } = await this.supabase
+      .from("restaurants")
+      .select("id")
+      .eq("active", true)
+      .limit(25);
+
+    if (restError || !restaurants || restaurants.length === 0) {
+      // Retornar lista vazia se não há restaurantes
+      return [];
+    }
+
+    // Gerar vouchers para cada restaurante
+    const vouchersToInsert = restaurants.map((restaurant) => ({
+      code: this.generateVoucherCode(),
+      profile_id: profileId,
+      pass_id: passId,
+      restaurant_id: restaurant.id,
+      status: "available" as const,
+    }));
+
+    const { data: createdVouchers, error: voucherError } = await this.supabase
+      .from("vouchers")
+      .insert(vouchersToInsert)
+      .select("*, restaurant:restaurants(*)");
+
+    if (voucherError) {
+      throw new Error(`Erro ao gerar vouchers: ${voucherError.message}`);
+    }
+
+    return createdVouchers || [];
   }
 
-  findForUser(userId: number, voucherId: number): Voucher {
-    this.usersService.findById(userId);
-    const voucher = this.vouchers.find(
-      (v) => v.userId === userId && v.id === voucherId
-    );
+  async listForUser(profileId: string): Promise<VoucherWithRestaurant[]> {
+    // Tentar buscar vouchers existentes
+    const { data: vouchers, error } = await this.supabase
+      .from("vouchers")
+      .select("*, restaurant:restaurants(*)")
+      .eq("profile_id", profileId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw new Error(`Erro ao buscar vouchers: ${error.message}`);
+    }
+
+    // Se não há vouchers, gerar novos
+    if (!vouchers || vouchers.length === 0) {
+      const newVouchers = await this.generateVouchersForUser(profileId);
+      return newVouchers as VoucherWithRestaurant[];
+    }
+
+    return vouchers as VoucherWithRestaurant[];
+  }
+
+  async findForUser(profileId: string, voucherId: string): Promise<VoucherWithRestaurant> {
+    const { data: voucher, error } = await this.supabase
+      .from("vouchers")
+      .select("*, restaurant:restaurants(*)")
+      .eq("id", voucherId)
+      .eq("profile_id", profileId)
+      .single();
+
+    if (error || !voucher) {
+      throw new NotFoundException("Voucher não encontrado");
+    }
+
+    return voucher as VoucherWithRestaurant;
+  }
+
+  async findById(voucherId: string): Promise<VoucherWithRestaurant | null> {
+    const { data: voucher, error } = await this.supabase
+      .from("vouchers")
+      .select("*, restaurant:restaurants(*)")
+      .eq("id", voucherId)
+      .single();
+
+    if (error || !voucher) {
+      return null;
+    }
+
+    return voucher as VoucherWithRestaurant;
+  }
+
+  async findByCode(code: string): Promise<(VoucherWithRestaurant & { profile?: { full_name: string; cpf: string } }) | null> {
+    // Normalizar código para uppercase
+    const normalizedCode = code.toUpperCase().trim();
+
+    const { data: voucher, error } = await this.supabase
+      .from("vouchers")
+      .select("*, restaurant:restaurants(*), profile:profiles(full_name, cpf)")
+      .eq("code", normalizedCode)
+      .single();
+
+    if (error || !voucher) {
+      return null;
+    }
+
+    return voucher as VoucherWithRestaurant & { profile?: { full_name: string; cpf: string } };
+  }
+
+  async useVoucher(profileId: string, voucherId: string): Promise<VoucherWithRestaurant> {
+    const voucher = await this.findForUser(profileId, voucherId);
+
+    if (voucher.status === "used") {
+      throw new BadRequestException("Voucher já utilizado");
+    }
+
+    if (voucher.status === "expired") {
+      throw new BadRequestException("Voucher expirado");
+    }
+
+    const { data: updatedVoucher, error } = await this.supabase
+      .from("vouchers")
+      .update({
+        status: "used",
+        used_at: new Date().toISOString(),
+      })
+      .eq("id", voucherId)
+      .select("*, restaurant:restaurants(*)")
+      .single();
+
+    if (error) {
+      throw new Error(`Erro ao marcar voucher como usado: ${error.message}`);
+    }
+
+    return updatedVoucher as VoucherWithRestaurant;
+  }
+
+  async useVoucherById(voucherId: string): Promise<VoucherWithRestaurant> {
+    const voucher = await this.findById(voucherId);
 
     if (!voucher) {
       throw new NotFoundException("Voucher não encontrado");
     }
 
-    return voucher;
-  }
-
-  findById(voucherId: number): Voucher | null {
-    const voucher = this.vouchers.find((v) => v.id === voucherId);
-    return voucher || null;
-  }
-
-  useVoucher(userId: number, voucherId: number): Voucher {
-    const voucher = this.findForUser(userId, voucherId);
-
-    if (voucher.used) {
+    if (voucher.status === "used") {
       throw new BadRequestException("Voucher já utilizado");
     }
 
-    voucher.used = true;
-    voucher.usedAt = new Date();
+    if (voucher.status === "expired") {
+      throw new BadRequestException("Voucher expirado");
+    }
 
-    return voucher;
+    const { data: updatedVoucher, error } = await this.supabase
+      .from("vouchers")
+      .update({
+        status: "used",
+        used_at: new Date().toISOString(),
+      })
+      .eq("id", voucherId)
+      .select("*, restaurant:restaurants(*)")
+      .single();
+
+    if (error) {
+      throw new Error(`Erro ao marcar voucher como usado: ${error.message}`);
+    }
+
+    return updatedVoucher as VoucherWithRestaurant;
   }
 
-  useVoucherById(voucherId: number): Voucher {
-    const voucher = this.findById(voucherId);
-    
+  async useVoucherByCode(code: string): Promise<VoucherWithRestaurant> {
+    const voucher = await this.findByCode(code);
+
     if (!voucher) {
       throw new NotFoundException("Voucher não encontrado");
     }
 
-    if (voucher.used) {
+    if (voucher.status === "used") {
       throw new BadRequestException("Voucher já utilizado");
     }
 
-    voucher.used = true;
-    voucher.usedAt = new Date();
+    if (voucher.status === "expired") {
+      throw new BadRequestException("Voucher expirado");
+    }
 
-    return voucher;
+    const { data: updatedVoucher, error } = await this.supabase
+      .from("vouchers")
+      .update({
+        status: "used",
+        used_at: new Date().toISOString(),
+      })
+      .eq("id", voucher.id)
+      .select("*, restaurant:restaurants(*)")
+      .single();
+
+    if (error) {
+      throw new Error(`Erro ao marcar voucher como usado: ${error.message}`);
+    }
+
+    return updatedVoucher as VoucherWithRestaurant;
   }
 }
-
