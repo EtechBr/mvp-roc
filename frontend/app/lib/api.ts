@@ -294,6 +294,36 @@ class ApiClient {
     return response;
   }
 
+  // Password reset endpoints
+  async forgotPassword(email: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+    }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email: email.toLowerCase().trim() }),
+    });
+  }
+
+  async validateResetToken(token: string) {
+    return this.request<{
+      valid: boolean;
+    }>("/auth/validate-reset-token", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    });
+  }
+
+  async resetPassword(token: string, password: string, passwordConfirmation: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+    }>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, password, passwordConfirmation }),
+    });
+  }
+
   // Vouchers endpoints
   async getVouchers(): Promise<Voucher[]> {
     return this.request<Voucher[]>("/vouchers", {
