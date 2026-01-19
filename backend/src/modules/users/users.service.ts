@@ -154,11 +154,11 @@ export class UsersService {
   async findByEmail(email: string): Promise<Profile | null> {
     // Normalizar email para minúsculas para busca case-insensitive
     const normalizedEmail = email.toLowerCase().trim();
-    
+
     const { data, error } = await this.supabase
       .from("profiles")
       .select("*")
-      .eq("email", normalizedEmail)
+      .ilike("email", normalizedEmail)
       .single();
 
     if (error || !data) {
@@ -224,5 +224,20 @@ export class UsersService {
     }
 
     return response;
+  }
+
+  // Atualizar senha do usuário
+  async updatePassword(id: string, newPassword: string): Promise<void> {
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    const { error } = await this.supabase
+      .from("profiles")
+      .update({ password_hash: passwordHash })
+      .eq("id", id);
+
+    if (error) {
+      throw new Error(`Erro ao atualizar senha: ${error.message}`);
+    }
   }
 }
