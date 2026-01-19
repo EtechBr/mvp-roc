@@ -210,7 +210,9 @@ export default function VoucherPage() {
     // Cleanup: remover subscription quando o componente for desmontado
     return () => {
       console.log("Realtime: Removendo subscription");
-      supabase.removeChannel(channel);
+      if (supabase) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [voucherId, isValidated]);
 
