@@ -6,9 +6,23 @@ class ValidateVoucherDto {
   code!: string;
 }
 
+class CheckVoucherDto {
+  code!: string;
+}
+
 @Controller("validation")
 export class ValidationController {
   constructor(private readonly validationService: ValidationService) {}
+
+  // Verificar cupom SEM marcar como usado (para tela de confirmação)
+  @Post("check")
+  async check(@Body() body: CheckVoucherDto) {
+    if (!body.code) {
+      throw new BadRequestException("Código do voucher é obrigatório");
+    }
+
+    return this.validationService.checkVoucherByCode(body.code);
+  }
 
   @Post()
   async validate(@Body() body: ValidateVoucherDto) {

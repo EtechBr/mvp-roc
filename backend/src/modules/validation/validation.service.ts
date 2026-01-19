@@ -67,6 +67,54 @@ export class ValidationService {
     };
   }
 
+  // Verificar voucher SEM marcar como usado (para tela de confirmação)
+  async checkVoucherByCode(code: string) {
+    // Normalizar código
+    const normalizedCode = code.toUpperCase().trim();
+
+    // Validar formato do código
+    if (!normalizedCode.match(/^ROC-[A-Z0-9]{5}$/)) {
+      throw new BadRequestException("Formato de código inválido. Use ROC-XXXXX");
+    }
+
+    // Buscar voucher por código
+    const voucher = await this.vouchersService.findByCode(normalizedCode);
+
+    if (!voucher) {
+      throw new BadRequestException("Voucher não encontrado");
+    }
+
+    if (voucher.status === "used") {
+      throw new BadRequestException("Voucher já foi utilizado");
+    }
+
+    if (voucher.status === "expired") {
+      throw new BadRequestException("Voucher expirado");
+    }
+
+    // Retornar informações SEM marcar como usado
+    return {
+      valid: true,
+      message: "Voucher válido",
+      voucher: {
+        id: voucher.id,
+        code: voucher.code,
+        restaurant: {
+          name: voucher.restaurant.name,
+          city: voucher.restaurant.city,
+          offer: voucher.restaurant.discount_label,
+          discountLabel: voucher.restaurant.discount_label,
+        },
+      },
+      customer: voucher.profile
+        ? {
+            name: voucher.profile.full_name,
+            cpf: maskCpf(voucher.profile.cpf),
+          }
+        : null,
+    };
+  }
+
   async validateVoucherByCode(code: string) {
     // Normalizar código
     const normalizedCode = code.toUpperCase().trim();
