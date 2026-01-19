@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import QRCode from "qrcode";
 import { Header } from "../../../components/Header";
 import { Footer } from "../../../components/Footer";
+import { supabase } from "../../../lib/supabase";
 import {
   ArrowLeft,
   CheckCircle,
@@ -27,6 +28,7 @@ import {
   Sparkle,
   CalendarCheck,
   Receipt,
+  SealCheck,
 } from "@phosphor-icons/react";
 
 interface VoucherDetail {
@@ -74,6 +76,8 @@ export default function VoucherPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(COUPON_VALIDITY_SECONDS);
   const [isExpired, setIsExpired] = useState(false);
+  const [isValidated, setIsValidated] = useState(false);
+  const [validatedAt, setValidatedAt] = useState<string | null>(null);
 
   // Buscar dados do voucher
   useEffect(() => {
@@ -109,6 +113,12 @@ export default function VoucherPage() {
         }
 
         const data = await response.json();
+
+        // Verificar se o voucher já foi usado/validado
+        if (data.used) {
+          setIsValidated(true);
+          setValidatedAt(data.usedAt || null);
+        }
 
         setVoucher({
           ...data,
@@ -153,6 +163,56 @@ export default function VoucherPage() {
       fetchVoucher();
     }
   }, [voucherId]);
+
+  // Supabase Realtime - Escutar mudanças no voucher
+  useEffect(() => {
+    if (!voucherId) {
+      console.log("Realtime: voucherId não disponível");
+      return;
+    }
+
+    if (!supabase) {
+      console.log("Realtime: Supabase client não disponível - verifique as variáveis de ambiente NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY");
+      return;
+    }
+
+    console.log("Realtime: Iniciando subscription para voucher:", voucherId);
+
+    // Criar subscription para escutar mudanças na tabela vouchers
+    const channel = supabase
+      .channel(`voucher-${voucherId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "vouchers",
+          filter: `id=eq.${voucherId}`,
+        },
+        (payload) => {
+          console.log("Realtime: Voucher atualizado!", payload);
+          const newData = payload.new as { status: string; used_at: string | null };
+
+          // Se o voucher foi marcado como usado, atualizar o estado
+          if (newData.status === "used" && !isValidated) {
+            console.log("Realtime: Voucher validado! Atualizando UI...");
+            setIsValidated(true);
+            setValidatedAt(newData.used_at);
+            setShowCoupon(false);
+            setIsExpired(false);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log("Realtime: Status da subscription:", status);
+      });
+
+    // Cleanup: remover subscription quando o componente for desmontado
+    return () => {
+      console.log("Realtime: Removendo subscription");
+      supabase.removeChannel(channel);
+    };
+  }, [voucherId, isValidated]);
 
   // Timer do cupom
   useEffect(() => {
@@ -610,7 +670,78 @@ export default function VoucherPage() {
               <div className="sticky top-28">
                 {/* Card de Resgate do Cupom */}
                 <div className="overflow-hidden rounded-2xl bg-white shadow-medium">
-                  {showCoupon ? (
+                  {isValidated ? (
+                    /* Cupom Já Validado */
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="p-6 text-center"
+                    >
+                      <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[var(--color-roc-success)]/10">
+                        <SealCheck
+                          size={48}
+                          weight="fill"
+                          className="text-[var(--color-roc-success)]"
+                        />
+                      </div>
+                      <h2 className="mb-2 text-xl font-bold text-[var(--color-text-dark)]">
+                        Cupom Validado!
+                      </h2>
+                      <p className="mb-4 text-sm text-[var(--color-text-medium)]">
+                        Este cupom já foi utilizado com sucesso.
+                      </p>
+
+                      {/* Data da validação */}
+                      {validatedAt && (
+                        <div className="mb-4 rounded-xl bg-[var(--color-bg-light)] p-4">
+                          <p className="text-xs text-[var(--color-text-medium)]">
+                            Validado em
+                          </p>
+                          <p className="font-medium text-[var(--color-text-dark)]">
+                            {new Date(validatedAt).toLocaleDateString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Código do cupom usado */}
+                      <div className="mb-4 rounded-xl bg-[var(--color-roc-success)]/10 p-4">
+                        <p className="mb-1 text-xs text-[var(--color-text-medium)]">
+                          Código do cupom
+                        </p>
+                        <span className="font-mono text-lg font-bold tracking-widest text-[var(--color-roc-success)]">
+                          {voucher.code}
+                        </span>
+                      </div>
+
+                      {/* Mensagem de agradecimento */}
+                      <div className="flex items-start gap-2 rounded-lg bg-[var(--color-roc-primary)]/10 p-3 text-left">
+                        <CheckCircle
+                          size={18}
+                          weight="fill"
+                          className="mt-0.5 flex-shrink-0 text-[var(--color-roc-primary)]"
+                        />
+                        <p className="text-xs text-[var(--color-text-medium)]">
+                          Obrigado por usar o <strong>ROC Passaporte</strong>!
+                          Esperamos que tenha aproveitado seu desconto.
+                        </p>
+                      </div>
+
+                      {/* Link para voltar */}
+                      <Link
+                        href="/account/vouchers"
+                        className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--color-roc-primary)] hover:underline"
+                      >
+                        <ArrowLeft size={16} />
+                        Ver outros cupons
+                      </Link>
+                    </motion.div>
+                  ) : showCoupon ? (
                     /* Cupom Gerado */
                     <div className="p-6 text-center">
                       {/* Timer */}
