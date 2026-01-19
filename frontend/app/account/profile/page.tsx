@@ -77,7 +77,15 @@ export default function ProfilePage() {
       setFormData({
         full_name: data.full_name || "",
         phone: data.phone || "",
-        address: data.address || {
+        address: data.address ? {
+          cep: data.address.cep || "",
+          street: data.address.street || "",
+          number: data.address.number || "",
+          complement: data.address.complement || "",
+          neighborhood: data.address.neighborhood || "",
+          city: data.address.city || "",
+          state: data.address.state || "",
+        } : {
           cep: "",
           street: "",
           number: "",
