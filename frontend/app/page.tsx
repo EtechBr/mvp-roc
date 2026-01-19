@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Ticket,
   ForkKnife,
@@ -18,8 +17,6 @@ import {
   Sparkle
 } from "@phosphor-icons/react";
 import { RestaurantCarousel } from "./components/RestaurantCarousel";
-import { useEffect, useState } from "react";
-import { apiClient } from "@/app/lib/api";
 
 // Componente FAQ Item
 function FAQItem({ question, answer }: { question: string; answer: string }) {
@@ -51,12 +48,6 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
 
 export default function Home() {
   const router = useRouter();
-
-  useEffect(() => {
-    if (apiClient.isAuthenticated() && apiClient.isRemembered()) {
-      router.push("/account/vouchers");
-    }
-  }, [router]);
 
   return (
     <div className="min-h-screen bg-[var(--color-bg-light)] font-[var(--font-family-primary)] text-[var(--color-text-dark)] antialiased">

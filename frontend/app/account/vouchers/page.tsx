@@ -93,6 +93,14 @@ export default function VouchersPage() {
           return;
         }
 
+        // Buscar nome do usuário do localStorage
+        const userName = localStorage.getItem("user_name");
+        if (userName) {
+          // Extrair apenas o primeiro nome
+          const firstName = userName.split(" ")[0];
+          setUser({ name: firstName });
+        }
+
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -112,10 +120,6 @@ export default function VouchersPage() {
         }
 
         const data = await response.json();
-
-        if (data.profile?.name) {
-          setUser({ name: data.profile.name });
-        }
 
         const normalized: Voucher[] =
           data.vouchers?.map((voucher: any) => ({
