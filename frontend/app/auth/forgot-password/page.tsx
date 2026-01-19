@@ -10,6 +10,7 @@ import {
   PaperPlaneTilt,
   CheckCircle,
 } from "@phosphor-icons/react";
+import { apiClient, ApiError } from "@/app/lib/api";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -23,11 +24,11 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
 
     try {
-      // Simular envio de email (implementar backend futuramente)
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await apiClient.forgotPassword(email);
       setIsSubmitted(true);
     } catch (err) {
-      setError("Erro ao enviar email. Tente novamente.");
+      const apiError = err as ApiError;
+      setError(apiError.message || "Erro ao enviar email. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
