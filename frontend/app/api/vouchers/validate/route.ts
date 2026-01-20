@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
     if (!rawCode.trim()) {
       return NextResponse.json(
-        { valid: false, reason: "Código não informado." },
+        { valid: false, message: "Código não informado.", reason: "Código não informado." },
         { status: 400 }
       );
     }
@@ -64,10 +64,12 @@ export async function POST(request: Request) {
     const data = await response.json();
 
     if (!response.ok) {
+      const errorMsg = data.message || "Erro ao validar cupom.";
       return NextResponse.json(
         {
           valid: false,
-          reason: data.message || "Erro ao validar cupom.",
+          message: errorMsg,
+          reason: errorMsg,
           voucher: data.voucher || null,
         },
         { status: response.status }
@@ -91,8 +93,9 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error("Erro ao validar voucher:", error);
+    const errorMsg = error.message || "Erro inesperado ao validar o cupom.";
     return NextResponse.json(
-      { valid: false, reason: error.message || "Erro inesperado ao validar o cupom." },
+      { valid: false, message: errorMsg, reason: errorMsg },
       { status: 500 }
     );
   }

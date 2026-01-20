@@ -293,10 +293,13 @@ export class VouchersService {
   }
 
   async useVoucherByCode(code: string): Promise<VoucherWithRestaurant> {
-    const voucher = await this.findByCode(code);
+    // Normalizar código
+    const normalizedCode = code.toUpperCase().trim();
+
+    const voucher = await this.findByCode(normalizedCode);
 
     if (!voucher) {
-      throw new NotFoundException("Voucher não encontrado");
+      throw new NotFoundException(`Voucher não encontrado: ${normalizedCode}`);
     }
 
     if (voucher.status === "used") {
@@ -307,6 +310,7 @@ export class VouchersService {
       throw new BadRequestException("Voucher expirado");
     }
 
+    // Usar o código do voucher encontrado (já normalizado do banco)
     const { data: updatedVoucher, error } = await this.supabase
       .from("vouchers")
       .update({
@@ -319,6 +323,15 @@ export class VouchersService {
 
     if (error) {
       throw new Error(`Erro ao marcar voucher como usado: ${error.message}`);
+    }
+
+    // Verificar se realmente foi atualizado
+    if (!updatedVoucher) {
+      throw new Error("Falha ao atualizar voucher - nenhum dado retornado");
+    }
+
+    if (updatedVoucher.status !== "used") {
+      throw new Error(`Falha ao atualizar status do voucher. Status atual: ${updatedVoucher.status}`);
     }
 
     return updatedVoucher as VoucherWithRestaurant;
