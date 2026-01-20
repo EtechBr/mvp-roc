@@ -61,10 +61,10 @@ export class AuthController {
       throw new BadRequestException("Todos os campos são obrigatórios");
     }
 
-    // Validação de CPF
-    if (!isValidCpf(body.cpf)) {
-      throw new BadRequestException("CPF inválido");
-    }
+    // Validação de CPF desabilitada temporariamente
+    // if (!isValidCpf(body.cpf)) {
+    //   throw new BadRequestException("CPF inválido");
+    // }
 
     if (body.password !== body.passwordConfirmation) {
       throw new BadRequestException("As senhas não conferem");
