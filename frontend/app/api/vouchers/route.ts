@@ -18,9 +18,8 @@ export async function GET(request: Request) {
       Authorization: authHeader,
     };
 
-    // Buscar todos os vouchers (aumentar limite para garantir que todos sejam carregados)
-    // Adicionar timestamp para evitar cache
-    const response = await fetch(`${BACKEND_URL}/vouchers?limit=100&_t=${Date.now()}`, {
+    // Buscar vouchers (limite de 50 é suficiente para a maioria dos usuários)
+    const response = await fetch(`${BACKEND_URL}/vouchers?limit=50`, {
       method: "GET",
       headers,
       cache: "no-store", // Desabilitar cache do Next.js

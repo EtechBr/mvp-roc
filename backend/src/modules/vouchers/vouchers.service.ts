@@ -173,17 +173,20 @@ export class VouchersService {
     options?: { page?: number; limit?: number }
   ): Promise<{ vouchers: VoucherWithRestaurant[]; total: number; page: number; totalPages: number }> {
     const page = options?.page || 1;
-    const limit = options?.limit || 20;
+    const limit = options?.limit || 50;
     const offset = (page - 1) * limit;
 
-    // Contar total de vouchers
-    const { count: total, error: countError } = await this.supabase
+    // Buscar vouchers com contagem em uma única query (mais eficiente)
+    const { data: vouchers, error, count: total } = await this.supabase
       .from("vouchers")
-      .select("*", { count: "exact", head: true })
-      .eq("profile_id", profileId);
+      .select("id, code, profile_id, pass_id, restaurant_id, status, used_at, created_at, expires_at, restaurant:restaurants(id, name, city, discount_label, image_url, category)", { count: "exact" })
+      .eq("profile_id", profileId)
+      .order("status", { ascending: true }) // available primeiro, depois used
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
-    if (countError) {
-      throw new Error(`Erro ao contar vouchers: ${countError.message}`);
+    if (error) {
+      throw new Error(`Erro ao buscar vouchers: ${error.message}`);
     }
 
     // Se não há vouchers, gerar novos
@@ -195,18 +198,6 @@ export class VouchersService {
         page: 1,
         totalPages: 1,
       };
-    }
-
-    // Buscar vouchers paginados
-    const { data: vouchers, error } = await this.supabase
-      .from("vouchers")
-      .select("*, restaurant:restaurants(*)")
-      .eq("profile_id", profileId)
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (error) {
-      throw new Error(`Erro ao buscar vouchers: ${error.message}`);
     }
 
     return {
