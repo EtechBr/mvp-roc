@@ -18,9 +18,12 @@ export async function GET(request: Request) {
       Authorization: authHeader,
     };
 
-    const response = await fetch(`${BACKEND_URL}/vouchers`, {
+    // Buscar todos os vouchers (aumentar limite para garantir que todos sejam carregados)
+    // Adicionar timestamp para evitar cache
+    const response = await fetch(`${BACKEND_URL}/vouchers?limit=100&_t=${Date.now()}`, {
       method: "GET",
       headers,
+      cache: "no-store", // Desabilitar cache do Next.js
     });
 
     if (!response.ok) {
@@ -37,7 +40,7 @@ export async function GET(request: Request) {
     const vouchersArray = responseData.data ?? responseData;
     const vouchersList = Array.isArray(vouchersArray) ? vouchersArray : [];
 
-    return NextResponse.json({
+    const jsonResponse = NextResponse.json({
       data: vouchersList.map((v: any) => ({
         id: v.id,
         code: v.code,
@@ -52,6 +55,12 @@ export async function GET(request: Request) {
       })),
       pagination: responseData.pagination || null,
     });
+
+    // Desabilitar cache para sempre obter dados frescos
+    jsonResponse.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    jsonResponse.headers.set("Pragma", "no-cache");
+
+    return jsonResponse;
   } catch (error: any) {
     console.error("Erro ao listar vouchers:", error);
     return NextResponse.json(

@@ -15,7 +15,7 @@ export class VouchersController {
     @Query("limit") limit?: string
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
-    const limitNum = limit ? Math.min(parseInt(limit, 10), 50) : 20; // máximo 50 por página
+    const limitNum = limit ? Math.min(parseInt(limit, 10), 100) : 100; // máximo 100 por página
 
     const result = await this.vouchersService.listForUser(user.id, {
       page: pageNum,

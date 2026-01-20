@@ -116,8 +116,9 @@ export default function VouchersPage() {
         Authorization: `Bearer ${token}`,
       };
 
-      const response = await fetch("/api/vouchers", {
+      const response = await fetch(`/api/vouchers?_t=${Date.now()}`, {
         headers,
+        cache: "no-store",
       });
 
       if (!response.ok) {
@@ -189,11 +190,12 @@ export default function VouchersPage() {
             const token = localStorage.getItem("auth_token");
             if (token) {
               try {
-                const response = await fetch("/api/vouchers", {
+                const response = await fetch(`/api/vouchers?_t=${Date.now()}`, {
                   headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                   },
+                  cache: "no-store",
                 });
                 if (response.ok) {
                   const data = await response.json();
