@@ -453,15 +453,41 @@ export default function VouchersPage() {
             </div>
 
             {/* Filtros Avançados */}
-            <AnimatePresence>
+            <AnimatePresence mode="wait">
               {showFilters && (
                 <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-white p-4"
+                  initial={{ opacity: 0, y: -10, scaleY: 0.95 }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                    scaleY: 1,
+                    transition: {
+                      type: "spring",
+                      stiffness: 300,
+                      damping: 24,
+                      mass: 0.8
+                    }
+                  }}
+                  exit={{
+                    opacity: 0,
+                    y: -10,
+                    scaleY: 0.95,
+                    transition: {
+                      duration: 0.15,
+                      ease: "easeOut"
+                    }
+                  }}
+                  style={{ originY: 0 }}
+                  className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-white p-4 shadow-soft"
                 >
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{
+                      opacity: 1,
+                      transition: { delay: 0.05, duration: 0.2 }
+                    }}
+                    className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+                  >
                     {/* Filtro por Cidade */}
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-medium)]">
@@ -560,17 +586,23 @@ export default function VouchersPage() {
                         />
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
 
                   {/* Limpar Filtros */}
-                  {hasActiveFilters && (
-                    <button
-                      onClick={clearFilters}
-                      className="mt-4 text-sm font-medium text-[var(--color-roc-primary)] hover:underline"
-                    >
-                      Limpar todos os filtros
-                    </button>
-                  )}
+                  <AnimatePresence>
+                    {hasActiveFilters && (
+                      <motion.button
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -5 }}
+                        transition={{ duration: 0.15 }}
+                        onClick={clearFilters}
+                        className="mt-4 text-sm font-medium text-[var(--color-roc-primary)] hover:underline"
+                      >
+                        Limpar todos os filtros
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               )}
             </AnimatePresence>
